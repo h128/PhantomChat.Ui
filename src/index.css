@@ -1,32 +1,21 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
-  --font-display: "Sora", "Space Grotesk", "Avenir Next", sans-serif;
-  --color-canvas-50: #f5efe1;
-  --color-ink-950: #08111d;
-  --color-ink-900: #102235;
-  --color-ink-800: #17324b;
-  --color-cream-50: #fcfaf4;
-  --color-mint-300: #86efac;
-  --color-sun-300: #fcd34d;
-  --color-coral-300: #fdba74;
+  --font-sans:
+    "Manrope", "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
+  --font-display:
+    "Space Grotesk", "Manrope", "Avenir Next", "Segoe UI", sans-serif;
+  --color-night-950: #09101d;
+  --color-night-900: #0b1120;
+  --color-night-800: #0f172a;
+  --color-sky-300: #7dd3fc;
+  --color-sky-400: #38bdf8;
+  --color-sky-500: #0ea5e9;
 }
 
 :root {
-  color: #e2e8f0;
-  background:
-    radial-gradient(
-      circle at 10% 0%,
-      rgba(34, 211, 238, 0.22),
-      transparent 26%
-    ),
-    radial-gradient(
-      circle at 82% 8%,
-      rgba(251, 191, 36, 0.18),
-      transparent 20%
-    ),
-    linear-gradient(180deg, #08111d 0%, #102235 42%, #f5efe1 42%, #f5efe1 100%);
+  color: #f8fafc;
+  background: #0b1120;
   font-family: var(--font-sans);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -46,6 +35,14 @@
   body {
     margin: 0;
     min-height: 100svh;
+    background:
+      radial-gradient(circle at top, rgba(56, 189, 248, 0.12), transparent 22%),
+      linear-gradient(180deg, #09101d 0%, #0b1120 100%);
+  }
+
+  button,
+  input {
+    font: inherit;
   }
 
   button {
@@ -53,11 +50,83 @@
   }
 
   ::selection {
-    background: rgba(34, 211, 238, 0.25);
-    color: #08111d;
+    background: rgba(56, 189, 248, 0.32);
+    color: #e0f2fe;
   }
 }
 
 #root {
   min-height: 100svh;
+}
+
+.network-grid {
+  opacity: 0.95;
+}
+
+.network-line {
+  stroke: rgba(125, 211, 252, 0.24);
+  stroke-width: 0.16;
+  stroke-linecap: round;
+  animation: network-line-pulse 10s ease-in-out infinite;
+}
+
+.network-node {
+  transform-origin: center;
+  animation: network-node-float 7.8s ease-in-out infinite;
+}
+
+.network-node-core {
+  fill: rgba(226, 232, 240, 0.96);
+}
+
+.network-node-halo {
+  fill: rgba(56, 189, 248, 0.14);
+  transform-origin: center;
+  animation: network-halo 5.8s ease-in-out infinite;
+}
+
+@keyframes network-line-pulse {
+  0%,
+  100% {
+    opacity: 0.14;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes network-node-float {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translateY(-1.6px) scale(1.16);
+    opacity: 1;
+  }
+}
+
+@keyframes network-halo {
+  0%,
+  100% {
+    transform: scale(0.85);
+    opacity: 0.08;
+  }
+  50% {
+    transform: scale(1.24);
+    opacity: 0.28;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .network-line,
+  .network-node,
+  .network-node-halo {
+    animation: none !important;
+  }
 }

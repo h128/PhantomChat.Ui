@@ -16,6 +16,6 @@ Vite + React + TypeScript starter configured with:
 - `npm run lint`
 - `npm run preview`
 
-### Warning: 
+### Warning:
 
-> this is still under construction and not ready for usse, nor collaboration yet. Please stay tuned 
+> this is still under construction and not ready for usse, nor collaboration yet. Please stay tuned
