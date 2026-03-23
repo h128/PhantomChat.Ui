@@ -44,7 +44,7 @@ export function HomePage() {
                 PhantomChat
               </p>
               <p className="text-sm text-slate-400">
-                fast room-based video entry
+                End to end encrypted chat
               </p>
             </div>
           </div>
@@ -65,7 +65,7 @@ export function HomePage() {
               </p>
             </div>
 
-            <div className="mt-10 rounded-[2rem] border border-white/10 bg-slate-950/55 p-4 shadow-[0_30px_120px_rgba(8,12,21,0.55)] backdrop-blur-xl sm:p-5">
+            <div className="mt-10 rounded-4xl border border-white/10 bg-slate-950/55 p-4 shadow-[0_30px_120px_rgba(8,12,21,0.55)] backdrop-blur-xl sm:p-5">
               <form
                 onSubmit={handleSubmit}
                 className="flex flex-col gap-3 sm:flex-row"
@@ -83,7 +83,7 @@ export function HomePage() {
                 <MeetingActionButton
                   type="submit"
                   disabled={!normalizedRoomName}
-                  className="sm:w-[10.5rem]"
+                  className="sm:w-42"
                 >
                   Go
                 </MeetingActionButton>

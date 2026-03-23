@@ -19,7 +19,7 @@ export function MeetingRoomPage() {
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,12,21,0.68)_0%,rgba(8,12,21,0.9)_100%)]" />
 
       <div className="relative z-10 mx-auto flex min-h-screen max-w-4xl items-center justify-center px-4 py-10 sm:px-6">
-        <div className="w-full max-w-2xl rounded-[2rem] border border-white/10 bg-slate-950/60 p-8 text-center shadow-[0_30px_120px_rgba(8,12,21,0.55)] backdrop-blur-xl sm:p-10">
+        <div className="w-full max-w-2xl rounded-4xl border border-white/10 bg-slate-950/60 p-8 text-center shadow-[0_30px_120px_rgba(8,12,21,0.55)] backdrop-blur-xl sm:p-10">
           <p className="text-sm font-medium uppercase tracking-[0.35em] text-sky-200/80">
             Room Placeholder
           </p>
