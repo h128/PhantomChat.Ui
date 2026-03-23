@@ -1,5 +1,7 @@
 # PhantomChat.UI
 
+## FE for the https://github.com/h128/PhantomChat
+
 Vite + React + TypeScript starter configured with:
 
 - React Compiler
@@ -13,3 +15,7 @@ Vite + React + TypeScript starter configured with:
 - `npm run build`
 - `npm run lint`
 - `npm run preview`
+
+### Warning: 
+
+> this is still under construction and not ready for usse, nor collaboration yet. Please stay tuned 
