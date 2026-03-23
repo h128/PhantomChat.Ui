@@ -1,13 +1,18 @@
-import { NavLink, Outlet, RouterProvider, createBrowserRouter } from 'react-router-dom'
-import { useAppSelector } from './app/hooks'
-import { presenceLabels, type PresenceMode } from './features/chat/chatSlice'
-import { NotFoundPage } from './routes/NotFoundPage'
-import { OverviewPage } from './routes/OverviewPage'
-import { RoomsPage } from './routes/RoomsPage'
+import {
+  NavLink,
+  Outlet,
+  RouterProvider,
+  createBrowserRouter,
+} from "react-router-dom";
+import { useAppSelector } from "./app/hooks";
+import { presenceLabels, type PresenceMode } from "./features/chat/chatSlice";
+import { NotFoundPage } from "./routes/NotFoundPage";
+import { OverviewPage } from "./routes/OverviewPage";
+import { RoomsPage } from "./routes/RoomsPage";
 
 const router = createBrowserRouter([
   {
-    path: '/',
+    path: "/",
     element: <AppShell />,
     children: [
       {
@@ -15,48 +20,52 @@ const router = createBrowserRouter([
         element: <OverviewPage />,
       },
       {
-        path: 'rooms',
+        path: "rooms",
         element: <RoomsPage />,
       },
       {
-        path: '*',
+        path: "*",
         element: <NotFoundPage />,
       },
     ],
   },
-])
+]);
 
 const navigation = [
-  { to: '/', label: 'Overview', end: true },
-  { to: '/rooms', label: 'Rooms' },
-]
+  { to: "/", label: "Overview", end: true },
+  { to: "/rooms", label: "Rooms" },
+];
 
 const presenceStyles: Record<
   PresenceMode,
   { badge: string; dot: string; detail: string }
 > = {
   focused: {
-    badge: 'border-emerald-300/30 bg-emerald-300/15 text-emerald-50',
-    dot: 'bg-emerald-300',
-    detail: 'Deep work windows stay protected while key rooms keep their signal.',
+    badge: "border-emerald-300/30 bg-emerald-300/15 text-emerald-50",
+    dot: "bg-emerald-300",
+    detail:
+      "Deep work windows stay protected while key rooms keep their signal.",
   },
   available: {
-    badge: 'border-amber-300/30 bg-amber-300/15 text-amber-50',
-    dot: 'bg-amber-300',
-    detail: 'Open for fast iteration, triage, and collaboration-heavy sessions.',
+    badge: "border-amber-300/30 bg-amber-300/15 text-amber-50",
+    dot: "bg-amber-300",
+    detail:
+      "Open for fast iteration, triage, and collaboration-heavy sessions.",
   },
   quiet: {
-    badge: 'border-fuchsia-300/30 bg-fuchsia-300/15 text-fuchsia-50',
-    dot: 'bg-fuchsia-300',
-    detail: 'Heads-down mode with only high-priority pings worth surfacing.',
+    badge: "border-fuchsia-300/30 bg-fuchsia-300/15 text-fuchsia-50",
+    dot: "bg-fuchsia-300",
+    detail: "Heads-down mode with only high-priority pings worth surfacing.",
   },
-}
+};
 
 function AppShell() {
-  const { activeRoomId, presenceMode, rooms } = useAppSelector((state) => state.chat)
-  const totalUnread = rooms.reduce((count, room) => count + room.unread, 0)
-  const activeRoom = rooms.find((room) => room.id === activeRoomId) ?? rooms[0]
-  const style = presenceStyles[presenceMode]
+  const { activeRoomId, presenceMode, rooms } = useAppSelector(
+    (state) => state.chat,
+  );
+  const totalUnread = rooms.reduce((count, room) => count + room.unread, 0);
+  const activeRoom = rooms.find((room) => room.id === activeRoomId) ?? rooms[0];
+  const style = presenceStyles[presenceMode];
 
   return (
     <div className="min-h-screen">
@@ -107,14 +116,14 @@ function AppShell() {
                   className={({ isActive }) =>
                     `flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-medium transition ${
                       isActive
-                        ? 'bg-slate-950 text-white shadow-lg'
-                        : 'bg-slate-900/5 text-slate-700 hover:bg-slate-900/10'
+                        ? "bg-slate-950 text-white shadow-lg"
+                        : "bg-slate-900/5 text-slate-700 hover:bg-slate-900/10"
                     }`
                   }
                 >
                   <span>{item.label}</span>
                   <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
-                    {String(index + 1).padStart(2, '0')}
+                    {String(index + 1).padStart(2, "0")}
                   </span>
                 </NavLink>
               ))}
@@ -130,7 +139,9 @@ function AppShell() {
               <p className="mt-2 text-sm leading-6 text-slate-600">
                 unread updates across {rooms.length} rooms
               </p>
-              <p className="mt-4 text-sm leading-6 text-slate-700">{style.detail}</p>
+              <p className="mt-4 text-sm leading-6 text-slate-700">
+                {style.detail}
+              </p>
             </div>
           </aside>
 
@@ -140,9 +151,9 @@ function AppShell() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 export default function App() {
-  return <RouterProvider router={router} />
+  return <RouterProvider router={router} />;
 }

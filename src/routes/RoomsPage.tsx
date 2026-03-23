@@ -1,10 +1,10 @@
-import { useAppDispatch, useAppSelector } from '../app/hooks'
-import { markRoomRead, setActiveRoom } from '../features/chat/chatSlice'
+import { useAppDispatch, useAppSelector } from "../app/hooks";
+import { markRoomRead, setActiveRoom } from "../features/chat/chatSlice";
 
 export function RoomsPage() {
-  const dispatch = useAppDispatch()
-  const { activeRoomId, rooms } = useAppSelector((state) => state.chat)
-  const activeRoom = rooms.find((room) => room.id === activeRoomId) ?? rooms[0]
+  const dispatch = useAppDispatch();
+  const { activeRoomId, rooms } = useAppSelector((state) => state.chat);
+  const activeRoom = rooms.find((room) => room.id === activeRoomId) ?? rooms[0];
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
@@ -25,15 +25,15 @@ export function RoomsPage() {
 
         <div className="mt-6 space-y-4">
           {rooms.map((room) => {
-            const isActive = room.id === activeRoomId
+            const isActive = room.id === activeRoomId;
 
             return (
               <article
                 key={room.id}
                 className={`rounded-[1.5rem] border p-5 transition ${
                   isActive
-                    ? 'border-slate-950 bg-slate-950 text-white shadow-xl shadow-slate-950/15'
-                    : 'border-slate-900/10 bg-white text-slate-950 shadow-sm'
+                    ? "border-slate-950 bg-slate-950 text-white shadow-xl shadow-slate-950/15"
+                    : "border-slate-900/10 bg-white text-slate-950 shadow-sm"
                 }`}
               >
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -44,19 +44,19 @@ export function RoomsPage() {
                         className={`rounded-full px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] ${
                           room.unread > 0
                             ? isActive
-                              ? 'bg-white/10 text-cyan-200'
-                              : 'bg-amber-100 text-amber-700'
+                              ? "bg-white/10 text-cyan-200"
+                              : "bg-amber-100 text-amber-700"
                             : isActive
-                              ? 'bg-white/10 text-slate-300'
-                              : 'bg-slate-100 text-slate-500'
+                              ? "bg-white/10 text-slate-300"
+                              : "bg-slate-100 text-slate-500"
                         }`}
                       >
-                        {room.unread > 0 ? `${room.unread} unread` : 'cleared'}
+                        {room.unread > 0 ? `${room.unread} unread` : "cleared"}
                       </span>
                     </div>
                     <p
                       className={`mt-3 max-w-2xl text-sm leading-6 ${
-                        isActive ? 'text-slate-300' : 'text-slate-600'
+                        isActive ? "text-slate-300" : "text-slate-600"
                       }`}
                     >
                       {room.topic}
@@ -69,19 +69,19 @@ export function RoomsPage() {
                       onClick={() => dispatch(setActiveRoom(room.id))}
                       className={`rounded-full px-4 py-2 text-sm font-medium transition ${
                         isActive
-                          ? 'bg-white text-slate-950 hover:bg-slate-100'
-                          : 'bg-slate-950 text-white hover:bg-slate-800'
+                          ? "bg-white text-slate-950 hover:bg-slate-100"
+                          : "bg-slate-950 text-white hover:bg-slate-800"
                       }`}
                     >
-                      {isActive ? 'Selected' : 'Select room'}
+                      {isActive ? "Selected" : "Select room"}
                     </button>
                     <button
                       type="button"
                       onClick={() => dispatch(markRoomRead(room.id))}
                       className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
                         isActive
-                          ? 'border-white/15 bg-white/5 text-white hover:bg-white/10'
-                          : 'border-slate-900/10 bg-white text-slate-700 hover:border-slate-900/20 hover:bg-slate-50'
+                          ? "border-white/15 bg-white/5 text-white hover:bg-white/10"
+                          : "border-slate-900/10 bg-white text-slate-700 hover:border-slate-900/20 hover:bg-slate-50"
                       }`}
                     >
                       Mark read
@@ -89,7 +89,7 @@ export function RoomsPage() {
                   </div>
                 </div>
               </article>
-            )
+            );
           })}
         </div>
       </section>
@@ -125,5 +125,5 @@ export function RoomsPage() {
         </div>
       </aside>
     </div>
-  )
+  );
 }

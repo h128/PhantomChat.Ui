@@ -1,22 +1,24 @@
-import { useAppDispatch, useAppSelector } from '../app/hooks'
+import { useAppDispatch, useAppSelector } from "../app/hooks";
 import {
   cyclePresenceMode,
   markRoomRead,
   presenceLabels,
   type PresenceMode,
-} from '../features/chat/chatSlice'
+} from "../features/chat/chatSlice";
 
 const toneStyles: Record<PresenceMode, string> = {
-  focused: 'from-emerald-400 to-cyan-400',
-  available: 'from-amber-400 to-orange-400',
-  quiet: 'from-fuchsia-500 to-rose-400',
-}
+  focused: "from-emerald-400 to-cyan-400",
+  available: "from-amber-400 to-orange-400",
+  quiet: "from-fuchsia-500 to-rose-400",
+};
 
 export function OverviewPage() {
-  const dispatch = useAppDispatch()
-  const { activeRoomId, presenceMode, rooms } = useAppSelector((state) => state.chat)
-  const totalUnread = rooms.reduce((count, room) => count + room.unread, 0)
-  const activeRoom = rooms.find((room) => room.id === activeRoomId) ?? rooms[0]
+  const dispatch = useAppDispatch();
+  const { activeRoomId, presenceMode, rooms } = useAppSelector(
+    (state) => state.chat,
+  );
+  const totalUnread = rooms.reduce((count, room) => count + room.unread, 0);
+  const activeRoom = rooms.find((room) => room.id === activeRoomId) ?? rooms[0];
 
   return (
     <div className="space-y-8">
@@ -60,7 +62,9 @@ export function OverviewPage() {
           <div
             className={`mt-5 h-3 rounded-full bg-gradient-to-r ${toneStyles[presenceMode]}`}
           ></div>
-          <p className="mt-5 text-2xl font-semibold">{presenceLabels[presenceMode]}</p>
+          <p className="mt-5 text-2xl font-semibold">
+            {presenceLabels[presenceMode]}
+          </p>
           <p className="mt-3 text-sm leading-6 text-slate-300">
             React Compiler is enabled in Vite, so this project starts from the
             optimized path instead of treating it like a later migration.
@@ -73,7 +77,9 @@ export function OverviewPage() {
           <p className="text-sm uppercase tracking-[0.25em] text-slate-400">
             Rooms
           </p>
-          <p className="mt-3 text-3xl font-semibold text-slate-950">{rooms.length}</p>
+          <p className="mt-3 text-3xl font-semibold text-slate-950">
+            {rooms.length}
+          </p>
           <p className="mt-2 text-sm leading-6 text-slate-600">
             Seeded with a few channels so the store and routing have something
             real to bind to.
@@ -84,7 +90,9 @@ export function OverviewPage() {
           <p className="text-sm uppercase tracking-[0.25em] text-slate-400">
             Unread
           </p>
-          <p className="mt-3 text-3xl font-semibold text-slate-950">{totalUnread}</p>
+          <p className="mt-3 text-3xl font-semibold text-slate-950">
+            {totalUnread}
+          </p>
           <p className="mt-2 text-sm leading-6 text-slate-600">
             Routed pages are reading from the same Redux state without extra
             boilerplate.
@@ -104,5 +112,5 @@ export function OverviewPage() {
         </article>
       </section>
     </div>
-  )
+  );
 }
