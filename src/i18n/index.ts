@@ -1,7 +1,7 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
-import enCommon from "../../public/locales/en/common.json";
-import faCommon from "../../public/locales/fa/common.json";
+import enCommon from "../locales/en/common.json";
+import faCommon from "../locales/fa/common.json";
 
 const resources = {
   fa: {

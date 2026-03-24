@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AnimatedDotNetwork } from "../components/AnimatedDotNetwork";
 import { MeetingActionButton } from "../components/MeetingActionButton";
 import { MeetingNameInput } from "../components/MeetingNameInput";
+import { useTranslate } from "@tolgee/react";
 
 function normalizeMeetingName(value: string) {
   return value
@@ -16,6 +17,7 @@ export function HomePage() {
   const navigate = useNavigate();
   const [roomName, setRoomName] = useState("");
   const normalizedRoomName = normalizeMeetingName(roomName);
+  const { t } = useTranslate();
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -29,6 +31,8 @@ export function HomePage() {
 
   return (
     <div className="relative isolate min-h-screen overflow-hidden bg-slate-950 text-white">
+      {t("phantom")}
+
       <AnimatedDotNetwork />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,12,21,0.72)_0%,rgba(8,12,21,0.84)_58%,rgba(8,12,21,0.96)_100%)]" />
 

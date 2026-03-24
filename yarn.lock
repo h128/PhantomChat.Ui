@@ -530,6 +530,25 @@
     "@tailwindcss/oxide" "4.2.2"
     tailwindcss "4.2.2"
 
+"@tolgee/core@6.6.0":
+  version "6.6.0"
+  resolved "https://registry.yarnpkg.com/@tolgee/core/-/core-6.6.0.tgz#b9d9c014dfd8ea74beddb4afe1967fe499dc5400"
+  integrity sha512-jN1RfHqTx6vLbyGz0A1qvu7gf/FFhsgEFJvLTx837vz2Z1MrRMsslJ39g3wVM90W7UmIM25yFmnXm6okvt+13g==
+
+"@tolgee/react@^6.6.0":
+  version "6.6.0"
+  resolved "https://registry.yarnpkg.com/@tolgee/react/-/react-6.6.0.tgz#8f0df6cc362d6ae0d603df4bed729bbf4c45166a"
+  integrity sha512-z6/ZPwLxW75fFCJib4Fe0myNIJs66BdrsoNQoz8ClXXT7thH7U0gwhjSeBGzbTfVPHJwQjNlD9mXQ9gPfFunbQ==
+  dependencies:
+    "@tolgee/web" "6.6.0"
+
+"@tolgee/web@6.6.0":
+  version "6.6.0"
+  resolved "https://registry.yarnpkg.com/@tolgee/web/-/web-6.6.0.tgz#4c7e93c6b909f062f0512a2b939f54be1d74471d"
+  integrity sha512-x96madaGFBwV9YBJTvATvtHKvFQuNU1UInw49ifQ+N/vSB857dMx4ef0P28WuZ9LhDRJnbjBPRWbB++ucR9QEA==
+  dependencies:
+    "@tolgee/core" "6.6.0"
+
 "@tybys/wasm-util@^0.10.1":
   version "0.10.1"
   resolved "https://registry.npmjs.org/@tybys/wasm-util/-/wasm-util-0.10.1.tgz"
