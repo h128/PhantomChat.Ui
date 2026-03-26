@@ -1,5 +1,4 @@
 import { Link, useParams } from "react-router-dom";
-import { AnimatedDotNetwork } from "../components/AnimatedDotNetwork";
 
 function formatRoomName(value: string) {
   return value
@@ -14,30 +13,72 @@ export function MeetingRoomPage() {
   const displayRoomName = formatRoomName(roomName) || "Untitled Room";
 
   return (
-    <div className="relative isolate min-h-screen overflow-hidden bg-slate-950 text-white">
-      <AnimatedDotNetwork />
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,12,21,0.68)_0%,rgba(8,12,21,0.9)_100%)]" />
+    <div className="relative isolate min-h-screen overflow-hidden bg-[#eaf2f9] text-slate-900">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(51,144,236,0.22),transparent_34%),linear-gradient(180deg,#f7fbff_0%,#eaf2f9_100%)]" />
+      <div className="absolute left-1/2 top-0 h-72 w-72 -translate-x-1/2 rounded-full bg-sky-300/20 blur-3xl sm:h-96 sm:w-96" />
 
-      <div className="relative z-10 mx-auto flex min-h-screen max-w-4xl items-center justify-center px-4 py-10 sm:px-6">
-        <div className="w-full max-w-2xl rounded-4xl border border-white/10 bg-slate-950/60 p-8 text-center shadow-[0_30px_120px_rgba(8,12,21,0.55)] backdrop-blur-xl sm:p-10">
-          <p className="text-sm font-medium uppercase tracking-[0.35em] text-sky-200/80">
-            Room Placeholder
-          </p>
-          <h1 className="mt-4 font-display text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-            {displayRoomName}
-          </h1>
-          <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-300">
-            The homepage form is routing correctly. This placeholder page is
-            ready to be replaced with the real meeting experience when you wire
-            that next step.
-          </p>
-          <Link
-            to="/"
-            className="mt-8 inline-flex h-12 items-center justify-center rounded-[1.1rem] bg-sky-500 px-6 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
-          >
-            Back home
-          </Link>
-        </div>
+      <div className="relative z-10 mx-auto flex min-h-screen max-w-5xl flex-col px-5 py-5 sm:px-6 sm:py-6">
+        <header className="flex justify-center sm:justify-start">
+          <div className="inline-flex items-center gap-3 rounded-full border border-white/80 bg-white/75 px-4 py-2 shadow-[0_12px_30px_rgba(15,23,42,0.08)] backdrop-blur-md">
+            <img
+              src="/comment.png"
+              alt="PhantomChat logo"
+              className="h-10 w-10 rounded-2xl object-cover"
+            />
+
+            <div className="text-left">
+              <p className="text-sm font-semibold tracking-[0.02em] text-slate-900">
+                PhantomChat
+              </p>
+              <p className="text-xs text-slate-500">
+                Private rooms with a minimal start screen
+              </p>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex flex-1 items-center justify-center py-8 sm:py-12">
+          <section className="w-full max-w-lg">
+            <div className="rounded-[2rem] border border-white/75 bg-white/82 px-6 py-8 text-center shadow-[0_32px_90px_rgba(15,23,42,0.12)] backdrop-blur-xl sm:px-10 sm:py-10">
+              <img
+                src="/comment.png"
+                alt="PhantomChat logo"
+                className="mx-auto h-24 w-24 rounded-[2rem] object-cover shadow-[0_18px_40px_rgba(51,144,236,0.24)] sm:h-28 sm:w-28"
+              />
+
+              <p className="mt-6 text-sm font-medium uppercase tracking-[0.28em] text-[#3390ec]">
+                Room Placeholder
+              </p>
+              <h1 className="mt-3 text-balance font-display text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.5rem]">
+                {displayRoomName}
+              </h1>
+              <p className="mt-3 text-sm leading-6 text-slate-500 sm:text-base">
+                The homepage routing is working. This screen now matches the
+                home route visually and is ready to be replaced with the real
+                meeting experience next.
+              </p>
+
+              <div className="mt-8 rounded-[1.5rem] border border-slate-200 bg-slate-50 px-5 py-4 text-left">
+                <p className="text-sm font-medium text-slate-500">Room link</p>
+                <p className="mt-1 break-all text-base font-semibold text-slate-900">
+                  /room/{roomName || "untitled-room"}
+                </p>
+              </div>
+
+              <Link
+                to="/"
+                className="mt-8 inline-flex h-14 items-center justify-center rounded-[1.35rem] bg-[#3390ec] px-8 text-base font-semibold text-white shadow-[0_16px_40px_rgba(51,144,236,0.24)] transition hover:bg-[#2b82d9]"
+              >
+                Back home
+              </Link>
+
+              <p className="mt-6 text-xs leading-5 text-slate-400">
+                Same palette, same spacing system, and a simpler placeholder
+                until the actual room UI is wired in.
+              </p>
+            </div>
+          </section>
+        </main>
       </div>
     </div>
   );
