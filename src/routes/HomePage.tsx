@@ -46,7 +46,7 @@ export function HomePage() {
                 PhantomChat
               </p>
               <p className="text-xs text-slate-500">
-                Private rooms with a minimal start screen
+                Just a clean place to start secure chatting
               </p>
             </div>
           </div>
@@ -61,7 +61,7 @@ export function HomePage() {
                 className="mx-auto h-24 w-24 rounded-4xl object-cover shadow-[0_18px_40px_rgba(51,144,236,0.24)] sm:h-28 sm:w-28"
               />
 
-              <h1 className="mt-6 text-balance font-display text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.5rem]">
+              <h1 className="mt-6 text-balance font-display text-[1.5rem] font-semibold tracking-tight text-slate-900 sm:text-[2.05rem]">
                 Start or join a room and jump straight into the conversation
               </h1>
               <form onSubmit={handleSubmit} className="mt-8">
