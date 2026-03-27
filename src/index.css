@@ -14,13 +14,34 @@
 }
 
 :root {
-  color: #f8fafc;
-  background: #0b1120;
+  --app-background: #f7fbff;
+  --app-background-muted: #eaf2f9;
+  --app-foreground: #0f172a;
+  --app-surface: rgba(255, 255, 255, 0.82);
+  --app-accent-glow: rgba(51, 144, 236, 0.22);
+  --app-selection-background: rgba(51, 144, 236, 0.24);
+  --app-selection-foreground: #082f49;
+  color: var(--app-foreground);
+  background: var(--app-background-muted);
+  color-scheme: light;
   font-family: var(--font-sans);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+:root[data-theme="dark"] {
+  --app-background: #09101d;
+  --app-background-muted: #0b1120;
+  --app-foreground: #f8fafc;
+  --app-surface: rgba(15, 23, 42, 0.72);
+  --app-accent-glow: rgba(56, 189, 248, 0.12);
+  --app-selection-background: rgba(56, 189, 248, 0.32);
+  --app-selection-foreground: #e0f2fe;
+  color: var(--app-foreground);
+  background: var(--app-background-muted);
+  color-scheme: dark;
 }
 
 @layer base {
@@ -35,9 +56,17 @@
   body {
     margin: 0;
     min-height: 100svh;
+    color: var(--app-foreground);
     background:
-      radial-gradient(circle at top, rgba(56, 189, 248, 0.12), transparent 22%),
-      linear-gradient(180deg, #09101d 0%, #0b1120 100%);
+      radial-gradient(circle at top, var(--app-accent-glow), transparent 22%),
+      linear-gradient(
+        180deg,
+        var(--app-background) 0%,
+        var(--app-background-muted) 100%
+      );
+    transition:
+      background 180ms ease,
+      color 180ms ease;
   }
 
   button,
@@ -50,8 +79,8 @@
   }
 
   ::selection {
-    background: rgba(56, 189, 248, 0.32);
-    color: #e0f2fe;
+    background: var(--app-selection-background);
+    color: var(--app-selection-foreground);
   }
 }
 
