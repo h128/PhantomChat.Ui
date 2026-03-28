@@ -34,55 +34,88 @@ export function ChatBoxBody() {
   }
 
   return (
-    <div className="flex-1 space-y-1 overflow-y-auto px-3 py-4 sm:px-5">
-      {messages.map((msg) => (
-        <div
-          key={msg.id}
-          className={clsx(
-            "group flex gap-3 rounded-xl px-2 py-2 transition-colors sm:px-3",
-            isDark ? "hover:bg-white/4" : "hover:bg-slate-100/60",
-          )}
-        >
+    <div className="flex-1 space-y-2 overflow-y-auto px-3 py-4 sm:px-5">
+      {messages.map((msg) => {
+        const isOwn = msg.senderId === "current-user";
+
+        return (
           <div
-            className={clsx(
-              "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-semibold",
-              isDark
-                ? "bg-sky-400/15 text-sky-300"
-                : "bg-[#3390ec]/10 text-[#3390ec]",
-            )}
+            key={msg.id}
+            className={clsx("flex", isOwn ? "justify-end" : "justify-start")}
           >
-            {msg.senderName.charAt(0).toUpperCase()}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-baseline gap-2">
-              <span
-                className={clsx(
-                  "text-sm font-semibold",
-                  isDark ? "text-slate-100" : "text-slate-900",
-                )}
-              >
-                {msg.senderName}
-              </span>
-              <span
-                className={clsx(
-                  "text-xs",
-                  isDark ? "text-slate-500" : "text-slate-400",
-                )}
-              >
-                {formatTime(msg.timestamp)}
-              </span>
-            </div>
-            <p
+            <div
               className={clsx(
-                "mt-0.5 text-sm leading-relaxed",
-                isDark ? "text-slate-300" : "text-slate-600",
+                "flex max-w-[75%] gap-3 rounded-2xl px-3.5 py-2.5",
+                isOwn
+                  ? isDark
+                    ? "bg-sky-400/15"
+                    : "bg-[#3390ec]/10"
+                  : isDark
+                    ? "bg-white/5"
+                    : "bg-slate-100/80",
               )}
             >
-              {msg.content}
-            </p>
+              {!isOwn && (
+                <div
+                  className={clsx(
+                    "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-semibold",
+                    isDark
+                      ? "bg-sky-400/15 text-sky-300"
+                      : "bg-[#3390ec]/10 text-[#3390ec]",
+                  )}
+                >
+                  {msg.senderName.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div className="min-w-0">
+                <div
+                  className={clsx(
+                    "flex items-baseline gap-2",
+                    isOwn && "justify-end",
+                  )}
+                >
+                  <span
+                    className={clsx(
+                      "text-sm font-semibold",
+                      isOwn
+                        ? isDark
+                          ? "text-sky-300"
+                          : "text-[#3390ec]"
+                        : isDark
+                          ? "text-slate-100"
+                          : "text-slate-900",
+                    )}
+                  >
+                    {msg.senderName}
+                  </span>
+                  <span
+                    className={clsx(
+                      "text-xs",
+                      isDark ? "text-slate-500" : "text-slate-400",
+                    )}
+                  >
+                    {formatTime(msg.timestamp)}
+                  </span>
+                </div>
+                <p
+                  className={clsx(
+                    "mt-0.5 text-sm leading-relaxed",
+                    isOwn
+                      ? isDark
+                        ? "text-slate-200"
+                        : "text-slate-700"
+                      : isDark
+                        ? "text-slate-300"
+                        : "text-slate-600",
+                  )}
+                >
+                  {msg.content}
+                </p>
+              </div>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
       <div ref={bottomRef} />
     </div>
   );
