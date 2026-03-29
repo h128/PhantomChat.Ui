@@ -9,6 +9,7 @@ import { setRoomInfo } from "../features/chat/chatSlice";
 import { selectResolvedTheme } from "../features/theme/themeSlice";
 import { useSocketCommand, useSocketState } from "../hooks/useSocket";
 import { SocketCommands } from "../services/socket/SocketCommands";
+import { getPersistentUserId } from "../utils/user";
 import { generateRandomRoomName } from "../utils/randomRoomName";
 
 function normalizeMeetingName(value: string) {
@@ -50,7 +51,7 @@ export function HomePage() {
       // Full payload as requested by user for Create/Join
       const payload = {
         command: SocketCommands.CREATE_ROOM,
-        user_uuid: "user-1", // Should ideally come from auth/localstorage
+        user_uuid: getPersistentUserId(), // Dynamic persistent ID per browser
         room_name: normalizedRoomName,
         public_key: "standard-v1-key", // Required by backend
       };

@@ -139,6 +139,7 @@ export class WebSocketClient {
   private handleMessage(messageEvent: MessageEvent) {
     try {
       const data = JSON.parse(messageEvent.data);
+      console.debug(`[WS] Raw Incoming ->`, data);
 
       // Handle PONGs (if server ever sends them unexpectedly)
       if (data.command === 0 || data.type === "pong") {
@@ -167,10 +168,22 @@ export class WebSocketClient {
 
       console.debug(`[WS] Unmatched Server Msg ->`, data);
 
-      // Discriminator: Push Events
+      // Discriminator: Push Events (Explicit event_name)
       if (data.event_name) {
         const event = data as SocketEvent;
         this.emit(event.event_name, event.payload);
+        return;
+      }
+
+      // Discriminator: Broadcasts (Messages from other users usually have no request_uuid)
+      if (data.message && !data.request_uuid) {
+        // Map common fields to what ChatSocketBridge (useChatSocketBridge.ts) expects
+        // It looks for 'message_received' event
+        this.emit("message_received", {
+          ...data,
+          content: data.message, // Ensure content field is populated
+          roomId: data.room_name || "general"
+        });
       }
     } catch (err) {
       console.error("Failed to parse socket message", err);

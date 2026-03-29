@@ -1,4 +1,5 @@
 import { createSlice, nanoid, type PayloadAction } from "@reduxjs/toolkit";
+import { getPersistentUserId, getPersistentUserName } from "../../utils/user";
 import type { RootState } from "../../app/store";
 
 export type PresenceMode = "focused" | "available" | "quiet";
@@ -222,8 +223,8 @@ const chatSlice = createSlice({
             roomId: payload.roomId,
             message: {
               id: nanoid(),
-              senderId: "current-user",
-              senderName: "You",
+              senderId: getPersistentUserId(),
+              senderName: getPersistentUserName(),
               content: payload.content,
               timestamp: new Date().toISOString(),
             },

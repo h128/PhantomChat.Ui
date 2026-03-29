@@ -5,6 +5,7 @@ import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { addMessage, selectActiveRoomId } from "../../features/chat/chatSlice";
 import { useSocketCommand } from "../../hooks/useSocket";
 import { SocketCommands } from "../../services/socket/SocketCommands";
+import { getPersistentUserId, getPersistentUserName } from "../../utils/user";
 import { useChatBox } from "./ChatBoxContext";
 
 export function ChatBoxFooter() {
@@ -18,6 +19,8 @@ export function ChatBoxFooter() {
     const trimmed = value.trim();
     if (!trimmed) return;
 
+    const userId = getPersistentUserId();
+
     // 1. Optimistic Update (Local UI)
     dispatch(addMessage({ roomId: activeRoomId, content: trimmed }));
     setValue("");
@@ -25,6 +28,7 @@ export function ChatBoxFooter() {
     // 2. Network Sync (Socket)
     try {
       await sendCommand(SocketCommands.JOIN_OR_MESSAGE, {
+        user_uuid: userId,
         room_name: activeRoomId,
         message: trimmed,
       });

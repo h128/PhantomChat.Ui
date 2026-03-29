@@ -6,8 +6,9 @@ import { ChatBox } from "../components/ChatBox";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { setActiveRoom } from "../features/chat/chatSlice";
 import { selectResolvedTheme } from "../features/theme/themeSlice";
-import { useSocketCommand } from "../hooks/useSocket";
+import { useSocketCommand, useSocketState } from "../hooks/useSocket";
 import { SocketCommands } from "../services/socket/SocketCommands";
+import { getPersistentUserId } from "../utils/user";
 
 function formatRoomName(value: string) {
   return value
@@ -22,16 +23,33 @@ export function MeetingRoomPage() {
   const dispatch = useAppDispatch();
   const resolvedTheme = useAppSelector(selectResolvedTheme);
   const sendCommand = useSocketCommand();
+  const socketState = useSocketState(); // Track connection state
 
   const isDark = resolvedTheme === "dark";
   const displayRoomName = formatRoomName(roomName) || "Untitled Room";
 
-  // 1. Immediate sync of activeRoomId
+  // 1. Immediate sync of activeRoomId and Join Room
   useEffect(() => {
-    if (roomName) {
-      dispatch(setActiveRoom(roomName));
-    }
-  }, [roomName, dispatch]);
+    if (!roomName || socketState !== "connected") return;
+    
+    dispatch(setActiveRoom(roomName));
+
+    // Send Join command (2) to subscribe to broadcasts
+    const joinRoom = async () => {
+      try {
+        await sendCommand(SocketCommands.JOIN_OR_MESSAGE, {
+          user_uuid: getPersistentUserId(),
+          room_name: roomName,
+          message: "Joining room...", // Payload requires 'message' per user docs
+        });
+        console.log(`[MeetingRoom] Successfully subscribed to ${roomName}`);
+      } catch (err) {
+        console.error(`[MeetingRoom] Failed to subscribe to ${roomName}:`, err);
+      }
+    };
+
+    joinRoom();
+  }, [roomName, dispatch, sendCommand, socketState]); // Re-run when socket connects
 
   // 2. Lifecycle adapter: Leave ONLY on actual unmount
   const leaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
