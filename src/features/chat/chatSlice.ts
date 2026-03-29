@@ -224,11 +224,26 @@ const chatSlice = createSlice({
         };
       },
     },
+    messageReceived(
+      state,
+      action: PayloadAction<{ roomId: string; message: ChatMessage }>,
+    ) {
+      const { roomId, message } = action.payload;
+      if (!state.messages[roomId]) {
+        state.messages[roomId] = [];
+      }
+      state.messages[roomId].push(message);
+    },
   },
 });
 
-export const { cyclePresenceMode, markRoomRead, setActiveRoom, addMessage } =
-  chatSlice.actions;
+export const {
+  cyclePresenceMode,
+  markRoomRead,
+  setActiveRoom,
+  addMessage,
+  messageReceived,
+} = chatSlice.actions;
 
 export const selectActiveRoomId = (state: RootState) => state.chat.activeRoomId;
 

@@ -15,14 +15,17 @@ export function useChatSocketBridge() {
   useSocketEvent("message_received", (payload: any) => {
     // 2. Map external payload to internal Redux Schema
     const message: ChatMessage = {
-      id: crypto.randomUUID(), // Guarantee uniqueness 
-      user_uuid: payload.user_uuid || "system",
-      text: payload.text || payload.content || "",
-      timestamp: Date.now()
+      id: crypto.randomUUID(), // Guarantee uniqueness
+      senderId: payload.user_uuid || payload.senderId || "system",
+      senderName: payload.senderName || payload.username || "Unknown",
+      content: payload.content || payload.text || "",
+      timestamp: payload.timestamp
+        ? new Date(payload.timestamp).toISOString()
+        : new Date().toISOString(),
     };
-    
+
     // 3. Dispatch to Domain Store, allowing memory caps to engage
-    dispatch(messageReceived(message));
+    dispatch(messageReceived({ roomId: payload.roomId ?? "general", message }));
   });
 
   useSocketEvent("user_joined", (_payload: any) => {
