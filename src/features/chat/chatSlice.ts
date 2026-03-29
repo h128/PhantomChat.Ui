@@ -1,84 +1,50 @@
-import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
+import { createSlice } from "@reduxjs/toolkit";
+import type { PayloadAction } from "@reduxjs/toolkit";
 
-export type PresenceMode = "focused" | "available" | "quiet";
-
-export interface Room {
+export interface ChatMessage {
   id: string;
-  name: string;
-  topic: string;
-  members: number;
-  unread: number;
+  user_uuid: string;
+  text: string;
+  timestamp: number;
 }
 
 interface ChatState {
-  presenceMode: PresenceMode;
-  activeRoomId: string;
-  rooms: Room[];
+  activeRoom: string | null;
+  messages: ChatMessage[];
 }
 
-const presenceOrder: PresenceMode[] = ["focused", "available", "quiet"];
-
-export const presenceLabels: Record<PresenceMode, string> = {
-  focused: "Focused",
-  available: "Available",
-  quiet: "Quiet Hours",
-};
-
 const initialState: ChatState = {
-  presenceMode: "focused",
-  activeRoomId: "launch-pad",
-  rooms: [
-    {
-      id: "launch-pad",
-      name: "Launch Pad",
-      topic: "Ship blockers, release timing, and cutover prep.",
-      members: 14,
-      unread: 7,
-    },
-    {
-      id: "signal-lab",
-      name: "Signal Lab",
-      topic: "User feedback triage and validation experiments.",
-      members: 8,
-      unread: 3,
-    },
-    {
-      id: "ops-watch",
-      name: "Ops Watch",
-      topic: "Deploy health, alerts, and overnight handoff notes.",
-      members: 5,
-      unread: 1,
-    },
-  ],
+  activeRoom: null,
+  messages: [],
 };
 
-const chatSlice = createSlice({
+// Architecture Requirement: Bounded In-Memory Window
+const MAX_MESSAGES_IN_MEMORY = 200;
+
+export const chatSlice = createSlice({
   name: "chat",
   initialState,
   reducers: {
-    cyclePresenceMode(state) {
-      const currentIndex = presenceOrder.indexOf(state.presenceMode);
-      state.presenceMode =
-        presenceOrder[(currentIndex + 1) % presenceOrder.length];
-    },
-    setActiveRoom(state, action: PayloadAction<string>) {
-      const roomExists = state.rooms.some((room) => room.id === action.payload);
-
-      if (roomExists) {
-        state.activeRoomId = action.payload;
+    setActiveRoom: (state, action: PayloadAction<string>) => {
+      if (state.activeRoom !== action.payload) {
+        state.activeRoom = action.payload;
+        state.messages = []; // Safety cleanup on roam
       }
     },
-    markRoomRead(state, action: PayloadAction<string>) {
-      const room = state.rooms.find((entry) => entry.id === action.payload);
-
-      if (room) {
-        room.unread = 0;
+    // Domain adapter directly accepts the event
+    messageReceived: (state, action: PayloadAction<ChatMessage>) => {
+      state.messages.push(action.payload);
+      
+      // Crucial part to resolve 4-hour memory crash
+      if (state.messages.length > MAX_MESSAGES_IN_MEMORY) {
+        state.messages = state.messages.slice(-MAX_MESSAGES_IN_MEMORY);
       }
     },
+    clearMessages: (state) => {
+      state.messages = [];
+    }
   },
 });
 
-export const { cyclePresenceMode, markRoomRead, setActiveRoom } =
-  chatSlice.actions;
-
+export const { setActiveRoom, messageReceived, clearMessages } = chatSlice.actions;
 export default chatSlice.reducer;
