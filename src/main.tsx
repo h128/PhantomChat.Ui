@@ -8,6 +8,7 @@ import { ThemeController } from "./features/theme/ThemeController";
 import { applyThemeToDocument } from "./features/theme/themeDom";
 import { selectResolvedTheme } from "./features/theme/themeSlice";
 import "./index.css";
+import "./utils/datetime";
 import { Tolgee, DevTools, TolgeeProvider, FormatSimple } from "@tolgee/react";
 
 const tolgee = Tolgee()
