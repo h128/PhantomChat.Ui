@@ -28,11 +28,14 @@ export function MeetingRoomPage() {
   const isDark = resolvedTheme === "dark";
   const displayRoomName = formatRoomName(roomName) || "Untitled Room";
 
+  const hasJoinedRef = useRef(false);
+
   // 1. Immediate sync of activeRoomId and Join Room
   useEffect(() => {
-    if (!roomName || socketState !== "connected") return;
+    if (!roomName || socketState !== "connected" || hasJoinedRef.current) return;
     
     dispatch(setActiveRoom(roomName));
+    hasJoinedRef.current = true; // Mark as joined to prevent duplicates in StrictMode
 
     // Send Join command (2) to subscribe to broadcasts
     const joinRoom = async () => {
@@ -40,11 +43,12 @@ export function MeetingRoomPage() {
         await sendCommand(SocketCommands.JOIN_OR_MESSAGE, {
           user_uuid: getPersistentUserId(),
           room_name: roomName,
-          message: "Joining room...", // Payload requires 'message' per user docs
+          message: "__JOIN__", // Special token for internal filtering
         });
         console.log(`[MeetingRoom] Successfully subscribed to ${roomName}`);
       } catch (err) {
         console.error(`[MeetingRoom] Failed to subscribe to ${roomName}:`, err);
+        hasJoinedRef.current = false; // Reset on failure so it can retry
       }
     };
 

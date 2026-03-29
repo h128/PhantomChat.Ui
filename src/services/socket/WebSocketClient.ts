@@ -1,9 +1,4 @@
-import type {
-  SocketState,
-  CommandResponse,
-  SocketEvent,
-  PendingRequest,
-} from "./types";
+import type { SocketState, CommandResponse, PendingRequest } from "./types";
 import { SocketTimeoutError, SocketDisconnectedError } from "./errors";
 
 // Typed Event Emitter callback
@@ -139,7 +134,11 @@ export class WebSocketClient {
   private handleMessage(messageEvent: MessageEvent) {
     try {
       const data = JSON.parse(messageEvent.data);
-      console.debug(`[WS] Raw Incoming ->`, data);
+      console.log(
+        `%c[WS] Raw Incoming ->`,
+        "color: #3b82f6; font-weight: bold",
+        data,
+      );
 
       // Handle PONGs (if server ever sends them unexpectedly)
       if (data.command === 0 || data.type === "pong") {
@@ -170,20 +169,14 @@ export class WebSocketClient {
 
       // Discriminator: Push Events (Explicit event_name)
       if (data.event_name) {
-        const event = data as SocketEvent;
-        this.emit(event.event_name, event.payload);
+        // The server sends data fields at the top level, not in a 'payload' property
+        this.emit(data.event_name, data);
         return;
       }
 
-      // Discriminator: Broadcasts (Messages from other users usually have no request_uuid)
+      // Discriminator: Broadcasts (Fallback for messages without explicit event_name)
       if (data.message && !data.request_uuid) {
-        // Map common fields to what ChatSocketBridge (useChatSocketBridge.ts) expects
-        // It looks for 'message_received' event
-        this.emit("message_received", {
-          ...data,
-          content: data.message, // Ensure content field is populated
-          roomId: data.room_name || "general"
-        });
+        this.emit("NewMessageReceived", data);
       }
     } catch (err) {
       console.error("Failed to parse socket message", err);
@@ -222,6 +215,30 @@ export class WebSocketClient {
     this.reconnectTimer = setTimeout(() => {
       this.connect();
     }, delay);
+  }
+
+  private startHeartbeat() {
+    // Heartbeat disabled because the backend returns "Unknown command" for command: 0
+    // If a heartbeat is truly needed, we must verify the correct command ID and structure.
+    /*
+    this.pingInterval = setInterval(() => {
+      if (this.ws && this.state === "connected") {
+        const ping = {
+          request_uuid: `heartbeat-${Date.now()}`,
+          command: 0,
+          type: "ping",
+        };
+        console.debug(`[WS] Sending Heartbeat:`, ping);
+        this.ws.send(JSON.stringify(ping));
+
+        // Setup strict timeout for pong reflection
+        this.pongTimeout = setTimeout(() => {
+          console.warn("Heartbeat Pong Timeout. Forcing disconnect.");
+          this.ws!.close();
+        }, this.PONG_WAIT);
+      }
+    }, this.PING_RATE);
+    */
   }
 
   private handlePong() {

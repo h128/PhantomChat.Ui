@@ -1,9 +1,9 @@
-export type SocketState = 
-  | "idle" 
-  | "connecting" 
-  | "connected" 
-  | "reconnecting" 
-  | "disconnected" 
+export type SocketState =
+  | "idle"
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "disconnected"
   | "error";
 
 export interface CommandRequest {
@@ -14,7 +14,7 @@ export interface CommandRequest {
 
 export interface CommandResponse {
   request_uuid: string; // Backend echoes the original request_uuid back
-  status: number;       // 0 = success
+  status: number; // 0 = success
   message?: string;
   error?: string;
   [key: string]: any;
@@ -28,7 +28,12 @@ export interface RoomResponse extends CommandResponse {
 }
 
 export interface SocketEvent {
-  event_name: "message_received" | "user_joined" | "room_created" | "balloon_received";
+  event_name:
+    | "NewMessageReceived"
+    | "UserEnteredRoom"
+    | "user_joined"
+    | "room_created"
+    | "balloon_received";
   payload: any;
 }
 

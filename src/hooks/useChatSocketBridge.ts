@@ -1,35 +1,34 @@
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { useSocketEvent } from "./useSocket";
-import { messageReceived } from "../features/chat/chatSlice";
+import { messageReceived, selectActiveRoomId } from "../features/chat/chatSlice";
 import type { ChatMessage } from "../features/chat/chatSlice";
 
-/**
- * Adapter Layer Custom Hook
- * Bridges the purely decoupled WebSocket Service to the Redux Store.
- * Implements strict Clean Architecture boundaries as designed.
- */
 export function useChatSocketBridge() {
   const dispatch = useDispatch();
+  const activeRoomId = useSelector(selectActiveRoomId);
 
-  // 1. Listen to typed events from the highly resilient Domain Service
-  useSocketEvent("message_received", (payload: any) => {
-    // 2. Map external payload to internal Redux Schema
+  // 1. Listen to the EXACT event name from the C++ backend
+  useSocketEvent("NewMessageReceived", (payload: any) => {
+    // 2. Filter out internal signaling messages
+    if (payload.message === "__JOIN__") return;
+
+    // 3. Map flat backend payload to internal Redux Schema
     const message: ChatMessage = {
-      id: crypto.randomUUID(), // Guarantee uniqueness
-      senderId: payload.user_uuid || payload.senderId || "system",
-      senderName: payload.senderName || payload.username || "Unknown",
-      content: payload.content || payload.text || "",
-      timestamp: payload.timestamp
-        ? new Date(payload.timestamp).toISOString()
-        : new Date().toISOString(),
+      id: crypto.randomUUID(), 
+      senderId: payload.sender_uuid || "system",
+      senderName: payload.sender_name || (payload.sender_uuid ? `User ${payload.sender_uuid.substring(0, 4)}` : "Unknown"),
+      content: payload.message || "",
+      timestamp: new Date().toISOString(),
     };
 
-    // 3. Dispatch to Domain Store, allowing memory caps to engage
-    dispatch(messageReceived({ roomId: payload.roomId ?? "general", message }));
+    // 4. Dispatch to the correct room. Fallback to activeRoomId if room_name is omitted.
+    dispatch(messageReceived({ 
+      roomId: payload.room_name || activeRoomId || "general", 
+      message 
+    }));
   });
 
-  useSocketEvent("user_joined", (_payload: any) => {
-    // Example: Dispatch balloon notification action
-    // dispatch(addBalloonNotification(`${payload.username} joined`));
+  useSocketEvent("UserEnteredRoom", (payload: any) => {
+    console.log(`[Socket] User ${payload.user_uuid} entered ${payload.room_name}`);
   });
 }
