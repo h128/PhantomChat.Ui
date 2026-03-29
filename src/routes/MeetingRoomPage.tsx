@@ -1,13 +1,13 @@
 import clsx from "clsx";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../app/hooks";
 import { ChatBox } from "../components/ChatBox";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { setActiveRoom } from "../features/chat/chatSlice";
 import { selectResolvedTheme } from "../features/theme/themeSlice";
-import { useSocketCommand, useSocketState } from "../hooks/useSocket";
-import type { RoomResponse } from "../services/socket/types";
+import { useSocketCommand } from "../hooks/useSocket";
+import { SocketCommands } from "../services/socket/SocketCommands";
 
 function formatRoomName(value: string) {
   return value
@@ -17,20 +17,41 @@ function formatRoomName(value: string) {
     .join(" ");
 }
 
-type RoomStatus = "connecting" | "joined" | "created" | "error";
-
 export function MeetingRoomPage() {
   const { roomName = "" } = useParams();
   const dispatch = useAppDispatch();
   const resolvedTheme = useAppSelector(selectResolvedTheme);
+  const sendCommand = useSocketCommand();
+
   const isDark = resolvedTheme === "dark";
   const displayRoomName = formatRoomName(roomName) || "Untitled Room";
 
+  // 1. Immediate sync of activeRoomId
   useEffect(() => {
     if (roomName) {
       dispatch(setActiveRoom(roomName));
     }
   }, [roomName, dispatch]);
+
+  // 2. Lifecycle adapter: Leave ONLY on actual unmount
+  const leaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  useEffect(() => {
+    // If we remount (StrictMode), clear any pending leave
+    if (leaveTimeoutRef.current) {
+      clearTimeout(leaveTimeoutRef.current);
+      leaveTimeoutRef.current = null;
+    }
+
+    return () => {
+      // Debounce the leave to avoid firing on StrictMode remounts
+      leaveTimeoutRef.current = setTimeout(() => {
+        sendCommand(SocketCommands.LEAVE_ROOM, { room_name: roomName }).catch(
+          () => {},
+        );
+      }, 100); 
+    };
+  }, [roomName, sendCommand]);
 
   return (
     <div

@@ -24,6 +24,8 @@ interface ChatState {
   activeRoomId: string;
   rooms: Room[];
   messages: Record<string, ChatMessage[]>;
+  roomKey: string | null;
+  roomStatus: "idle" | "joining" | "joined" | "error";
 }
 
 const presenceOrder: PresenceMode[] = ["focused", "available", "quiet"];
@@ -173,6 +175,8 @@ const initialState: ChatState = {
     },
   ],
   messages: mockMessages,
+  roomKey: null,
+  roomStatus: "idle",
 };
 
 const chatSlice = createSlice({
@@ -185,11 +189,7 @@ const chatSlice = createSlice({
         presenceOrder[(currentIndex + 1) % presenceOrder.length];
     },
     setActiveRoom(state, action: PayloadAction<string>) {
-      const roomExists = state.rooms.some((room) => room.id === action.payload);
-
-      if (roomExists) {
-        state.activeRoomId = action.payload;
-      }
+      state.activeRoomId = action.payload;
     },
     markRoomRead(state, action: PayloadAction<string>) {
       const room = state.rooms.find((entry) => entry.id === action.payload);
@@ -197,6 +197,13 @@ const chatSlice = createSlice({
       if (room) {
         room.unread = 0;
       }
+    },
+    setRoomInfo(
+      state,
+      action: PayloadAction<{ key: string; status: ChatState["roomStatus"] }>,
+    ) {
+      state.roomKey = action.payload.key;
+      state.roomStatus = action.payload.status;
     },
     addMessage: {
       reducer(
@@ -243,6 +250,7 @@ export const {
   setActiveRoom,
   addMessage,
   messageReceived,
+  setRoomInfo,
 } = chatSlice.actions;
 
 export const selectActiveRoomId = (state: RootState) => state.chat.activeRoomId;

@@ -3,6 +3,8 @@ import { Send } from "lucide-react";
 import { useState } from "react";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { addMessage, selectActiveRoomId } from "../../features/chat/chatSlice";
+import { useSocketCommand } from "../../hooks/useSocket";
+import { SocketCommands } from "../../services/socket/SocketCommands";
 import { useChatBox } from "./ChatBoxContext";
 
 export function ChatBoxFooter() {
@@ -10,12 +12,26 @@ export function ChatBoxFooter() {
   const [value, setValue] = useState("");
   const dispatch = useAppDispatch();
   const activeRoomId = useAppSelector(selectActiveRoomId);
+  const sendCommand = useSocketCommand();
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const trimmed = value.trim();
     if (!trimmed) return;
+
+    // 1. Optimistic Update (Local UI)
     dispatch(addMessage({ roomId: activeRoomId, content: trimmed }));
     setValue("");
+
+    // 2. Network Sync (Socket)
+    try {
+      await sendCommand(SocketCommands.JOIN_OR_MESSAGE, {
+        room_name: activeRoomId,
+        message: trimmed,
+      });
+    } catch (err) {
+      console.error("Failed to send socket message:", err);
+      // Optional: Add "retry" or "error" state to the message in Redux if needed
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
