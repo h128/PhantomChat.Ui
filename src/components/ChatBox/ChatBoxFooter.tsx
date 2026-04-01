@@ -6,7 +6,7 @@ import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { addMessage, selectActiveRoomId } from "../../features/chat/chatSlice";
 import { useSocketCommand } from "../../hooks/useSocket";
 import { SocketCommands } from "../../services/socket/SocketCommands";
-import { getPersistentUserId, getPersistentUserName } from "../../utils/user";
+import { getPersistentUserId } from "../../utils/user";
 import { useChatBox } from "./ChatBoxContext";
 
 export function ChatBoxFooter() {
@@ -29,6 +29,17 @@ export function ChatBoxFooter() {
     dispatch(addMessage({ roomId: activeRoomId, content: trimmed }));
     setValue("");
     setShowEmojiPicker(false);
+
+    // 2. Network Sync (Socket)
+    try {
+      await sendCommand(SocketCommands.JOIN_OR_MESSAGE, {
+        user_uuid: userId,
+        room_name: activeRoomId,
+        message: trimmed,
+      });
+    } catch (err) {
+      console.error("Failed to send socket message:", err);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

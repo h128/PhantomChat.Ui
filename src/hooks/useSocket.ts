@@ -19,9 +19,13 @@ export function useSocketCommand() {
   );
 }
 
+export type CallbackType<T extends SocketEvent["event_name"]> = (
+  payload: Extract<SocketEvent, { event_name: T }>["payload"]
+) => void;
+
 export function useSocketEvent<T extends SocketEvent["event_name"]>(
   eventName: T,
-  callback: (payload: Extract<SocketEvent, { event_name: T }>["payload"]) => void
+  callback: CallbackType<T>
 ) {
   const { client } = useSocketContext();
 

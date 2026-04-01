@@ -1,8 +1,10 @@
-import type { SocketState, CommandResponse, PendingRequest } from "./types";
+import type { SocketState, CommandResponse, PendingRequest, SocketEvent } from "./types";
 import { SocketTimeoutError, SocketDisconnectedError } from "./errors";
 
 // Typed Event Emitter callback
-export type EventCallback = (payload: any) => void;
+export type EventCallback<T extends SocketEvent["event_name"] = any> = (
+  payload: Extract<SocketEvent, { event_name: T }>["payload"],
+) => void;
 
 export class WebSocketClient {
   private url: string;
@@ -11,7 +13,7 @@ export class WebSocketClient {
 
   // Maps & Timers
   private pendingRequests = new Map<string, PendingRequest>();
-  private listeners = new Map<string, Set<EventCallback>>();
+  private listeners = new Map<string, Set<EventCallback<any>>>();
 
   // Reconnect Config
   private reconnectAttempts = 0;
@@ -105,20 +107,29 @@ export class WebSocketClient {
   }
 
   /** Event Emitter Core */
-  public on(event: string, callback: EventCallback) {
+  public on<T extends SocketEvent["event_name"]>(
+    event: T,
+    callback: EventCallback<T>,
+  ) {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
-    this.listeners.get(event)!.add(callback);
+    this.listeners.get(event)!.add(callback as EventCallback<any>);
   }
 
-  public off(event: string, callback: EventCallback) {
+  public off<T extends SocketEvent["event_name"]>(
+    event: T,
+    callback: EventCallback<T>,
+  ) {
     if (this.listeners.has(event)) {
-      this.listeners.get(event)!.delete(callback);
+      this.listeners.get(event)!.delete(callback as EventCallback<any>);
     }
   }
 
-  private emit(event: string, payload: any) {
+  private emit<T extends SocketEvent["event_name"]>(
+    event: T,
+    payload: Extract<SocketEvent, { event_name: T }>["payload"],
+  ) {
     if (this.listeners.has(event)) {
       this.listeners.get(event)!.forEach((cb) => cb(payload));
     }
@@ -217,30 +228,6 @@ export class WebSocketClient {
     }, delay);
   }
 
-  private startHeartbeat() {
-    // Heartbeat disabled because the backend returns "Unknown command" for command: 0
-    // If a heartbeat is truly needed, we must verify the correct command ID and structure.
-    /*
-    this.pingInterval = setInterval(() => {
-      if (this.ws && this.state === "connected") {
-        const ping = {
-          request_uuid: `heartbeat-${Date.now()}`,
-          command: 0,
-          type: "ping",
-        };
-        console.debug(`[WS] Sending Heartbeat:`, ping);
-        this.ws.send(JSON.stringify(ping));
-
-        // Setup strict timeout for pong reflection
-        this.pongTimeout = setTimeout(() => {
-          console.warn("Heartbeat Pong Timeout. Forcing disconnect.");
-          this.ws!.close();
-        }, this.PONG_WAIT);
-      }
-    }, this.PING_RATE);
-    */
-  }
-
   private handlePong() {
     if (this.pongTimeout) {
       clearTimeout(this.pongTimeout);
@@ -259,7 +246,7 @@ export class WebSocketClient {
     this.reconnectTimer = null;
 
     // 2. Reject all inflight requests (prevent hanging promises)
-    for (const [uuid, pending] of this.pendingRequests.entries()) {
+    for (const pending of this.pendingRequests.values()) {
       clearTimeout(pending.timeoutId);
       pending.reject(new SocketDisconnectedError());
     }

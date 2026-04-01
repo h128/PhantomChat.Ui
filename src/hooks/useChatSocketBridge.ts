@@ -3,60 +3,62 @@ import { useSocketEvent } from "./useSocket";
 import { messageReceived, selectActiveRoomId } from "../features/chat/chatSlice";
 import { getPersistentUserId } from "../utils/user";
 import type { ChatMessage } from "../features/chat/chatSlice";
+import type { NewMessagePayload, UserEnteredPayload } from "../services/socket/types";
+
+// 1. Move helpers outside hook to prevent re-creation
+const formatDisplayName = (uuid: string) => {
+  if (!uuid) return "Unknown";
+  const segments = uuid.split("_");
+  return `User ${segments[1] || uuid.substring(0, 5)}`;
+};
 
 export function useChatSocketBridge() {
   const dispatch = useDispatch();
   const activeRoomId = useSelector(selectActiveRoomId);
 
-  // Helper to format consistent display names from persistent IDs
-  const formatDisplayName = (uuid: string) => {
-    if (!uuid) return "Unknown";
-    const segments = uuid.split("_");
-    return `User ${segments[1] || uuid.substring(0, 5)}`;
-  };
-
-  // 1. Listen to the EXACT event name from the C++ backend
-  useSocketEvent("NewMessageReceived", (payload: any) => {
-    // 2. Filter out internal signaling messages
-    if (payload.message === "__JOIN__") return;
-
-    // 3. Map flat backend payload to internal Redux Schema
+  // 2. Consolidated Message Handler
+  const handleIncomingMessage = (
+    roomId: string | undefined, 
+    senderId: string, 
+    senderName: string, 
+    content: string
+  ) => {
     const message: ChatMessage = {
       id: crypto.randomUUID(), 
-      senderId: payload.sender_uuid || "system",
-      senderName: payload.sender_name || formatDisplayName(payload.sender_uuid),
-      content: payload.message || "",
+      senderId,
+      senderName,
+      content,
       timestamp: new Date().toISOString(),
     };
 
-    // 4. Dispatch to the correct room
     dispatch(messageReceived({ 
-      roomId: payload.room_name || activeRoomId || "general", 
+      roomId: roomId || activeRoomId || "general", 
       message 
     }));
+  };
+
+  // 3. New Message Logic
+  useSocketEvent("NewMessageReceived", (payload: NewMessagePayload) => {
+    if (payload.message === "__JOIN__") return;
+
+    handleIncomingMessage(
+      payload.room_name,
+      payload.sender_uuid || "system",
+      payload.sender_name || formatDisplayName(payload.sender_uuid),
+      payload.message || ""
+    );
   });
 
-  useSocketEvent("UserEnteredRoom", (payload: any) => {
-    // 1. Identify the user
-    const userDisplayName = formatDisplayName(payload.user_uuid);
+  // 4. User Entry Logic
+  useSocketEvent("UserEnteredRoom", (payload: UserEnteredPayload) => {
     const currentUserId = getPersistentUserId();
-
-    // 2. Ignore self-entry
     if (payload.user_uuid === currentUserId) return;
 
-    // 3. Create a system-level ChatMessage
-    const message: ChatMessage = {
-      id: crypto.randomUUID(),
-      senderId: "system",
-      senderName: "System",
-      content: `${userDisplayName} entered the room.`,
-      timestamp: new Date().toISOString(),
-    };
-
-    // 4. Dispatch
-    dispatch(messageReceived({ 
-      roomId: payload.room_name || activeRoomId || "general", 
-      message 
-    }));
+    handleIncomingMessage(
+      payload.room_name,
+      "system",
+      "System",
+      `${formatDisplayName(payload.user_uuid)} entered the room.`
+    );
   });
 }
