@@ -1,11 +1,15 @@
 import clsx from "clsx";
 import { type FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAppDispatch, useAppSelector } from "../app/hooks";
 import { MeetingActionButton } from "../components/MeetingActionButton";
 import { MeetingNameInput } from "../components/MeetingNameInput";
 import { ThemeToggle } from "../components/ThemeToggle";
-import { useAppSelector } from "../app/hooks";
+import { setRoomInfo } from "../features/chat/chatSlice";
 import { selectResolvedTheme } from "../features/theme/themeSlice";
+import { useSocketCommand, useSocketState } from "../hooks/useSocket";
+import { SocketCommands } from "../services/socket/SocketCommands";
+import { getPersistentUserId } from "../utils/user";
 import { generateRandomRoomName } from "../utils/randomRoomName";
 
 function normalizeMeetingName(value: string) {
@@ -18,19 +22,61 @@ function normalizeMeetingName(value: string) {
 
 export function HomePage() {
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
+  const socketState = useSocketState();
+  const sendCommand = useSocketCommand();
+
   const resolvedTheme = useAppSelector(selectResolvedTheme);
   const isDark = resolvedTheme === "dark";
   const [roomName, setRoomName] = useState(generateRandomRoomName());
+  const [isJoining, setIsJoining] = useState(false);
   const normalizedRoomName = normalizeMeetingName(roomName);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!normalizedRoomName) {
+    if (!normalizedRoomName || isJoining) {
       return;
     }
 
-    navigate(`/room/${normalizedRoomName}`);
+    if (socketState !== "connected") {
+      alert("Socket is not connected. Please wait...");
+      return;
+    }
+
+    setIsJoining(true);
+    try {
+      dispatch(setRoomInfo({ key: "", status: "joining" }));
+      
+      // Full payload as requested by user for Create/Join
+      const payload = {
+        command: SocketCommands.CREATE_ROOM,
+        user_uuid: getPersistentUserId(), // Dynamic persistent ID per browser
+        room_name: normalizedRoomName,
+        public_key: "standard-v1-key", // Required by backend
+      };
+
+      const response = await sendCommand(payload.command, {
+        user_uuid: payload.user_uuid,
+        room_name: payload.room_name,
+        public_key: payload.public_key,
+      });
+
+      dispatch(
+        setRoomInfo({
+          key: response.room_key || "no-key",
+          status: "joined",
+        }),
+      );
+
+      navigate(`/room/${normalizedRoomName}`);
+    } catch (err) {
+      dispatch(setRoomInfo({ key: "", status: "error" }));
+      console.error("Failed to join/create room:", err);
+      alert("Failed to join or create room. Please try again.");
+    } finally {
+      setIsJoining(false);
+    }
   }
 
   return (
@@ -147,7 +193,7 @@ export function HomePage() {
 
                   <MeetingActionButton
                     type="submit"
-                    disabled={!normalizedRoomName}
+                    disabled={!normalizedRoomName || isJoining}
                     className={clsx(
                       "sm:w-36",
                       isDark
@@ -155,7 +201,7 @@ export function HomePage() {
                         : "bg-[#3390ec] text-white shadow-[0_16px_40px_rgba(51,144,236,0.24)] hover:bg-[#2b82d9] disabled:bg-[#dce9f6] disabled:text-[#8fa7be] disabled:shadow-none",
                     )}
                   >
-                    Continue
+                    {isJoining ? "Joining..." : "Continue"}
                   </MeetingActionButton>
                 </div>
               </form>

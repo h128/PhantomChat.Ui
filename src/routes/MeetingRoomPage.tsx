@@ -1,11 +1,14 @@
 import clsx from "clsx";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../app/hooks";
 import { ChatBox } from "../components/ChatBox";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { setActiveRoom } from "../features/chat/chatSlice";
 import { selectResolvedTheme } from "../features/theme/themeSlice";
+import { useSocketCommand, useSocketState } from "../hooks/useSocket";
+import { SocketCommands } from "../services/socket/SocketCommands";
+import { getPersistentUserId } from "../utils/user";
 
 function formatRoomName(value: string) {
   return value
@@ -19,14 +22,58 @@ export function MeetingRoomPage() {
   const { roomName = "" } = useParams();
   const dispatch = useAppDispatch();
   const resolvedTheme = useAppSelector(selectResolvedTheme);
+  const sendCommand = useSocketCommand();
+  const socketState = useSocketState(); // Track connection state
+
   const isDark = resolvedTheme === "dark";
   const displayRoomName = formatRoomName(roomName) || "Untitled Room";
 
+  const hasJoinedRef = useRef(false);
+
+  // 1. Immediate sync of activeRoomId and Join Room
   useEffect(() => {
-    if (roomName) {
-      dispatch(setActiveRoom(roomName));
+    if (!roomName || socketState !== "connected" || hasJoinedRef.current) return;
+    
+    dispatch(setActiveRoom(roomName));
+    hasJoinedRef.current = true; // Mark as joined to prevent duplicates in StrictMode
+
+    // Send Join command (2) to subscribe to broadcasts
+    const joinRoom = async () => {
+      try {
+        await sendCommand(SocketCommands.JOIN_OR_MESSAGE, {
+          user_uuid: getPersistentUserId(),
+          room_name: roomName,
+          message: "__JOIN__", // Special token for internal filtering
+        });
+        console.log(`[MeetingRoom] Successfully subscribed to ${roomName}`);
+      } catch (err) {
+        console.error(`[MeetingRoom] Failed to subscribe to ${roomName}:`, err);
+        hasJoinedRef.current = false; // Reset on failure so it can retry
+      }
+    };
+
+    joinRoom();
+  }, [roomName, dispatch, sendCommand, socketState]); // Re-run when socket connects
+
+  // 2. Lifecycle adapter: Leave ONLY on actual unmount
+  const leaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  useEffect(() => {
+    // If we remount (StrictMode), clear any pending leave
+    if (leaveTimeoutRef.current) {
+      clearTimeout(leaveTimeoutRef.current);
+      leaveTimeoutRef.current = null;
     }
-  }, [roomName, dispatch]);
+
+    return () => {
+      // Debounce the leave to avoid firing on StrictMode remounts
+      leaveTimeoutRef.current = setTimeout(() => {
+        sendCommand(SocketCommands.LEAVE_ROOM, { room_name: roomName }).catch(
+          () => {},
+        );
+      }, 100); 
+    };
+  }, [roomName, sendCommand]);
 
   return (
     <div
@@ -65,7 +112,6 @@ export function MeetingRoomPage() {
               alt="PhantomChat logo"
               className="h-10 w-10 rounded-2xl object-cover"
             />
-
             <div className="text-left">
               <p
                 className={clsx(
@@ -85,7 +131,6 @@ export function MeetingRoomPage() {
               </p>
             </div>
           </div>
-
           <ThemeToggle />
         </header>
 

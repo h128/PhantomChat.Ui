@@ -2,6 +2,8 @@ import { RouterProvider, createBrowserRouter } from "react-router-dom";
 import { HomePage } from "./routes/HomePage";
 import { MeetingRoomPage } from "./routes/MeetingRoomPage";
 import { NotFoundPage } from "./routes/NotFoundPage";
+import { SocketProvider } from "./context/SocketContext";
+import { useChatSocketBridge } from "./hooks/useChatSocketBridge";
 
 const router = createBrowserRouter([
   {
@@ -18,6 +20,16 @@ const router = createBrowserRouter([
   },
 ]);
 
+function SocketBridgeLoader() {
+  useChatSocketBridge();
+  return null;
+}
+
 export default function App() {
-  return <RouterProvider router={router} />;
+  return (
+    <SocketProvider>
+      <SocketBridgeLoader />
+      <RouterProvider router={router} />
+    </SocketProvider>
+  );
 }
