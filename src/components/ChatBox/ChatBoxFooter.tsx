@@ -1,6 +1,7 @@
 import clsx from "clsx";
-import { Send } from "lucide-react";
-import { useState } from "react";
+import EmojiPicker, { Theme, type EmojiClickData } from "emoji-picker-react";
+import { Send, Smile } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { addMessage, selectActiveRoomId } from "../../features/chat/chatSlice";
 import { useChatBox } from "./ChatBoxContext";
@@ -8,6 +9,9 @@ import { useChatBox } from "./ChatBoxContext";
 export function ChatBoxFooter() {
   const { isDark } = useChatBox();
   const [value, setValue] = useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
   const dispatch = useAppDispatch();
   const activeRoomId = useAppSelector(selectActiveRoomId);
 
@@ -16,6 +20,7 @@ export function ChatBoxFooter() {
     if (!trimmed) return;
     dispatch(addMessage({ roomId: activeRoomId, content: trimmed }));
     setValue("");
+    setShowEmojiPicker(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -25,13 +30,46 @@ export function ChatBoxFooter() {
     }
   };
 
+  const handleEmojiClick = (emojiData: EmojiClickData) => {
+    setValue((prev) => prev + emojiData.emoji);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        pickerRef.current &&
+        !pickerRef.current.contains(e.target as Node) &&
+        !toggleRef.current?.contains(e.target as Node)
+      ) {
+        setShowEmojiPicker(false);
+      }
+    };
+
+    if (showEmojiPicker) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showEmojiPicker]);
+
   return (
     <div
       className={clsx(
-        "border-t px-4 py-3 sm:px-5",
+        "relative border-t px-4 py-3 sm:px-5",
         isDark ? "border-white/8" : "border-slate-200/80",
       )}
     >
+      {showEmojiPicker && (
+        <div ref={pickerRef} className="absolute bottom-full right-4 z-10 mb-2">
+          <EmojiPicker
+            theme={isDark ? Theme.DARK : Theme.LIGHT}
+            onEmojiClick={handleEmojiClick}
+            searchPlaceholder="Search Emoji"
+            width={350}
+            height={400}
+          />
+        </div>
+      )}
+
       <div
         className={clsx(
           "flex items-center gap-2 rounded-2xl border px-4 py-2.5",
@@ -51,6 +89,23 @@ export function ChatBoxFooter() {
             isDark ? "text-slate-100" : "text-slate-900",
           )}
         />
+        <button
+          ref={toggleRef}
+          type="button"
+          onClick={() => setShowEmojiPicker((prev) => !prev)}
+          className={clsx(
+            "flex h-8 w-8 items-center justify-center rounded-xl transition",
+            showEmojiPicker
+              ? isDark
+                ? "text-sky-400"
+                : "text-[#3390ec]"
+              : isDark
+                ? "text-slate-500 hover:text-slate-300"
+                : "text-slate-400 hover:text-slate-600",
+          )}
+        >
+          <Smile size={18} />
+        </button>
         <button
           type="button"
           onClick={handleSend}
