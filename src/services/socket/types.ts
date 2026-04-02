@@ -40,9 +40,17 @@ export type UserEnteredPayload = {
   room_name: string;
 };
 
+export type FileUploadedPayload = {
+  event_name: "FileUploaded";
+  file_name: string;
+  user_uuid: string;
+  poster: boolean;
+};
+
 export type SocketEvent =
   | { event_name: "NewMessageReceived"; payload: NewMessagePayload }
   | { event_name: "UserEnteredRoom"; payload: UserEnteredPayload }
+  | { event_name: "FileUploaded"; payload: FileUploadedPayload }
   | { event_name: "user_joined"; payload: any }
   | { event_name: "room_created"; payload: RoomResponse }
   | { event_name: "balloon_received"; payload: any }

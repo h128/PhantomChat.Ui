@@ -1,22 +1,84 @@
 import clsx from "clsx";
 import EmojiPicker, { Theme, type EmojiClickData } from "emoji-picker-react";
-import { Send, Smile } from "lucide-react";
+import { Paperclip, Send, Smile } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
-import { addMessage, selectActiveRoomId } from "../../features/chat/chatSlice";
+import {
+  addMessage,
+  fileMessageReceived,
+  selectActiveRoomId,
+  selectRoomKey,
+} from "../../features/chat/chatSlice";
+import type { FileAttachment } from "../../features/chat/chatSlice";
 import { useSocketCommand } from "../../hooks/useSocket";
+import { encryptFile } from "../../services/crypto";
+import {
+  createThumbnail,
+  generateFileName,
+  getExtension,
+  isImageFile,
+  uploadFile,
+} from "../../services/fileUpload";
 import { SocketCommands } from "../../services/socket/SocketCommands";
-import { getPersistentUserId } from "../../utils/user";
+import { getPersistentUserId, getPersistentUserName } from "../../utils/user";
 import { useChatBox } from "./ChatBoxContext";
+
+async function processFileUpload(
+  file: File,
+  roomKey: string,
+  activeRoomId: string,
+  userId: string,
+): Promise<FileAttachment> {
+  const ext = getExtension(file.name);
+
+  if (isImageFile(file)) {
+    const thumbnailFileName = generateFileName(userId, ext, false);
+    const originalFileName = generateFileName(userId, ext, true);
+
+    const thumbnailBytes = await createThumbnail(file);
+    const originalBytes = new Uint8Array(await file.arrayBuffer());
+
+    const [encryptedThumb, encryptedOriginal] = await Promise.all([
+      encryptFile(thumbnailBytes, roomKey),
+      encryptFile(originalBytes, roomKey),
+    ]);
+
+    await Promise.all([
+      uploadFile(encryptedThumb, thumbnailFileName, activeRoomId, userId),
+      uploadFile(encryptedOriginal, originalFileName, activeRoomId, userId),
+    ]);
+
+    return {
+      fileName: originalFileName,
+      originalName: file.name,
+      type: "image",
+      thumbnailFile: thumbnailFileName,
+    };
+  }
+
+  const fileName = generateFileName(userId, ext, false);
+  const fileBytes = new Uint8Array(await file.arrayBuffer());
+  const encrypted = await encryptFile(fileBytes, roomKey);
+  await uploadFile(encrypted, fileName, activeRoomId, userId);
+
+  return {
+    fileName,
+    originalName: file.name,
+    type: "file",
+  };
+}
 
 export function ChatBoxFooter() {
   const { isDark } = useChatBox();
   const [value, setValue] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const dispatch = useAppDispatch();
   const activeRoomId = useAppSelector(selectActiveRoomId);
+  const roomKey = useAppSelector(selectRoomKey);
   const sendCommand = useSocketCommand();
 
   const handleSend = async () => {
@@ -40,6 +102,39 @@ export function ChatBoxFooter() {
     } catch (err) {
       console.error("Failed to send socket message:", err);
     }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !roomKey) return;
+
+    e.target.value = "";
+
+    const userId = getPersistentUserId();
+
+    setIsUploading(true);
+    processFileUpload(file, roomKey, activeRoomId, userId)
+      .then((attachment) => {
+        dispatch(
+          fileMessageReceived({
+            roomId: activeRoomId,
+            message: {
+              id: crypto.randomUUID(),
+              senderId: userId,
+              senderName: getPersistentUserName(),
+              content: "",
+              timestamp: new Date().toISOString(),
+              attachment,
+            },
+          }),
+        );
+      })
+      .catch((err) => {
+        console.error("File upload failed:", err);
+      })
+      .then(() => {
+        setIsUploading(false);
+      });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -89,6 +184,13 @@ export function ChatBoxFooter() {
         </div>
       )}
 
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        onChange={handleFileSelect}
+      />
+
       <div
         className={clsx(
           "flex items-center gap-2 rounded-2xl border px-4 py-2.5",
@@ -97,17 +199,6 @@ export function ChatBoxFooter() {
             : "border-slate-200 bg-slate-50",
         )}
       >
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Write a message..."
-          className={clsx(
-            "flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400",
-            isDark ? "text-slate-100" : "text-slate-900",
-          )}
-        />
         <button
           ref={toggleRef}
           type="button"
@@ -125,23 +216,49 @@ export function ChatBoxFooter() {
         >
           <Smile size={18} />
         </button>
-        <button
-          type="button"
-          onClick={handleSend}
-          disabled={!value.trim()}
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Message"
           className={clsx(
-            "flex h-8 w-8 items-center justify-center rounded-xl transition",
-            value.trim()
-              ? isDark
-                ? "bg-sky-400 text-slate-950 hover:bg-sky-300"
-                : "bg-[#3390ec] text-white hover:bg-[#2b82d9]"
-              : isDark
-                ? "text-slate-600"
-                : "text-slate-300",
+            "flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400",
+            isDark ? "text-slate-100" : "text-slate-900",
           )}
-        >
-          <Send size={16} />
-        </button>
+        />
+        {value.trim() ? (
+          <button
+            type="button"
+            onClick={handleSend}
+            className={clsx(
+              "flex h-8 w-8 items-center justify-center rounded-xl transition",
+              isDark
+                ? "bg-sky-400 text-slate-950 hover:bg-sky-300"
+                : "bg-[#3390ec] text-white hover:bg-[#2b82d9]",
+            )}
+          >
+            <Send size={16} />
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={isUploading}
+            onClick={() => fileInputRef.current?.click()}
+            className={clsx(
+              "flex h-8 w-8 items-center justify-center rounded-xl transition",
+              isUploading
+                ? isDark
+                  ? "text-slate-600"
+                  : "text-slate-300"
+                : isDark
+                  ? "text-slate-500 hover:text-slate-300"
+                  : "text-slate-400 hover:text-slate-600",
+            )}
+          >
+            <Paperclip size={18} />
+          </button>
+        )}
       </div>
     </div>
   );

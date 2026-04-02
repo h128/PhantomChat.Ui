@@ -12,12 +12,20 @@ export interface Room {
   unread: number;
 }
 
+export interface FileAttachment {
+  fileName: string;
+  originalName: string;
+  type: "image" | "file";
+  thumbnailFile?: string;
+}
+
 export interface ChatMessage {
   id: string;
   senderId: string;
   senderName: string;
   content: string;
   timestamp: string;
+  attachment?: FileAttachment;
 }
 
 interface ChatState {
@@ -132,6 +140,19 @@ const chatSlice = createSlice({
       }
       state.messages[roomId].push(message);
     },
+    fileMessageReceived(
+      state,
+      action: PayloadAction<{
+        roomId: string;
+        message: ChatMessage;
+      }>,
+    ) {
+      const { roomId, message } = action.payload;
+      if (!state.messages[roomId]) {
+        state.messages[roomId] = [];
+      }
+      state.messages[roomId].push(message);
+    },
   },
 });
 
@@ -141,6 +162,7 @@ export const {
   setActiveRoom,
   addMessage,
   messageReceived,
+  fileMessageReceived,
   setRoomInfo,
 } = chatSlice.actions;
 
@@ -151,5 +173,7 @@ export const selectActiveRoom = (state: RootState) =>
 
 export const selectActiveRoomMessages = (state: RootState) =>
   state.chat.messages[state.chat.activeRoomId] ?? [];
+
+export const selectRoomKey = (state: RootState) => state.chat.roomKey;
 
 export default chatSlice.reducer;

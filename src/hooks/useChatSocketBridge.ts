@@ -1,9 +1,17 @@
 import { useDispatch, useSelector } from "react-redux";
 import { useSocketEvent } from "./useSocket";
-import { messageReceived, selectActiveRoomId } from "../features/chat/chatSlice";
+import {
+  fileMessageReceived,
+  messageReceived,
+  selectActiveRoomId,
+} from "../features/chat/chatSlice";
 import { getPersistentUserId } from "../utils/user";
 import type { ChatMessage } from "../features/chat/chatSlice";
-import type { NewMessagePayload, UserEnteredPayload } from "../services/socket/types";
+import type {
+  FileUploadedPayload,
+  NewMessagePayload,
+  UserEnteredPayload,
+} from "../services/socket/types";
 
 // 1. Move helpers outside hook to prevent re-creation
 const formatDisplayName = (uuid: string) => {
@@ -58,7 +66,67 @@ export function useChatSocketBridge() {
       payload.room_name,
       "system",
       "System",
-      `${formatDisplayName(payload.user_uuid)} entered the room.`
+      `${formatDisplayName(payload.user_uuid)} entered the room.`,
     );
+  });
+
+  // 5. File Uploaded Logic
+  useSocketEvent("FileUploaded", (payload: FileUploadedPayload) => {
+    const currentUserId = getPersistentUserId();
+    // Skip files uploaded by the current user (already shown via optimistic update)
+    if (payload.user_uuid === currentUserId) return;
+    // Only handle poster files for images (the original) or non-poster for regular files.
+    // For images the backend sends two events: one poster=false (thumbnail) and one poster=true (original).
+    // We only create a message on the poster=true event (the original), and use the thumbnail filename
+    // by deriving it from the original filename (strip "_poster" from the name).
+    // For non-image files, poster is always false.
+
+    const fileName = payload.file_name;
+    const isImage = /\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(fileName);
+
+    if (isImage) {
+      // Only react to the poster (original) event to avoid duplicate messages
+      if (!payload.poster) return;
+
+      const thumbnailFile = fileName.replace("_poster", "");
+      const message: ChatMessage = {
+        id: crypto.randomUUID(),
+        senderId: payload.user_uuid,
+        senderName: formatDisplayName(payload.user_uuid),
+        content: "",
+        timestamp: new Date().toISOString(),
+        attachment: {
+          fileName,
+          originalName: fileName,
+          type: "image",
+          thumbnailFile,
+        },
+      };
+      dispatch(
+        fileMessageReceived({
+          roomId: activeRoomId || "general",
+          message,
+        }),
+      );
+    } else {
+      const message: ChatMessage = {
+        id: crypto.randomUUID(),
+        senderId: payload.user_uuid,
+        senderName: formatDisplayName(payload.user_uuid),
+        content: "",
+        timestamp: new Date().toISOString(),
+        attachment: {
+          fileName,
+          originalName: fileName,
+          type: "file",
+        },
+      };
+      dispatch(
+        fileMessageReceived({
+          roomId: activeRoomId || "general",
+          message,
+        }),
+      );
+    }
   });
 }

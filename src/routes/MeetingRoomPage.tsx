@@ -29,51 +29,52 @@ export function MeetingRoomPage() {
   const displayRoomName = formatRoomName(roomName) || "Untitled Room";
 
   const hasJoinedRef = useRef(false);
+  const sendCommandRef = useRef(sendCommand);
+  useEffect(() => {
+    sendCommandRef.current = sendCommand;
+  }, [sendCommand]);
 
   // 1. Immediate sync of activeRoomId and Join Room
   useEffect(() => {
     if (!roomName || socketState !== "connected" || hasJoinedRef.current) return;
-    
-    dispatch(setActiveRoom(roomName));
-    hasJoinedRef.current = true; // Mark as joined to prevent duplicates in StrictMode
 
-    // Send Join command (2) to subscribe to broadcasts
+    dispatch(setActiveRoom(roomName));
+    hasJoinedRef.current = true;
+
     const joinRoom = async () => {
       try {
-        await sendCommand(SocketCommands.JOIN_OR_MESSAGE, {
+        await sendCommandRef.current(SocketCommands.JOIN_OR_MESSAGE, {
           user_uuid: getPersistentUserId(),
           room_name: roomName,
-          message: "__JOIN__", // Special token for internal filtering
+          message: "__JOIN__",
         });
         console.log(`[MeetingRoom] Successfully subscribed to ${roomName}`);
       } catch (err) {
         console.error(`[MeetingRoom] Failed to subscribe to ${roomName}:`, err);
-        hasJoinedRef.current = false; // Reset on failure so it can retry
+        hasJoinedRef.current = false;
       }
     };
 
     joinRoom();
-  }, [roomName, dispatch, sendCommand, socketState]); // Re-run when socket connects
+  }, [roomName, dispatch, socketState]);
 
   // 2. Lifecycle adapter: Leave ONLY on actual unmount
   const leaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  
+
   useEffect(() => {
-    // If we remount (StrictMode), clear any pending leave
     if (leaveTimeoutRef.current) {
       clearTimeout(leaveTimeoutRef.current);
       leaveTimeoutRef.current = null;
     }
 
     return () => {
-      // Debounce the leave to avoid firing on StrictMode remounts
       leaveTimeoutRef.current = setTimeout(() => {
-        sendCommand(SocketCommands.LEAVE_ROOM, { room_name: roomName }).catch(
-          () => {},
-        );
-      }, 100); 
+        sendCommandRef.current(SocketCommands.LEAVE_ROOM, {
+          room_name: roomName,
+        }).catch(() => {});
+      }, 100);
     };
-  }, [roomName, sendCommand]);
+  }, [roomName]);
 
   return (
     <div
