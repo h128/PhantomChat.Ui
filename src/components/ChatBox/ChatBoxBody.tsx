@@ -43,7 +43,9 @@ function ImageAttachment({
       .then((encrypted) => decryptFile(encrypted, roomKey))
       .then((decrypted) => {
         if (!cancelled) {
-          setThumbUrl(URL.createObjectURL(new Blob([decrypted])));
+          setThumbUrl(
+            URL.createObjectURL(new Blob([new Uint8Array(decrypted)])),
+          );
         }
       })
       .catch((err) => {
@@ -69,7 +71,9 @@ function ImageAttachment({
     setLoadingFull(true);
     const result = await downloadFile(roomName, attachment.fileName)
       .then((encrypted) => decryptFile(encrypted, roomKey))
-      .then((decrypted) => URL.createObjectURL(new Blob([decrypted])))
+      .then((decrypted) =>
+        URL.createObjectURL(new Blob([new Uint8Array(decrypted)])),
+      )
       .catch((err) => {
         console.error("Failed to load full image:", err);
         return null;
@@ -85,7 +89,7 @@ function ImageAttachment({
           <img
             src={thumbUrl}
             alt={attachment.originalName}
-            className="max-w-[200px] rounded-lg"
+            className="max-w-50 rounded-lg"
           />
         ) : (
           <div
@@ -146,7 +150,7 @@ function FileAttachmentCard({
     await downloadFile(roomName, attachment.fileName)
       .then((encrypted) => decryptFile(encrypted, roomKey))
       .then((decrypted) => {
-        const url = URL.createObjectURL(new Blob([decrypted]));
+        const url = URL.createObjectURL(new Blob([new Uint8Array(decrypted)]));
         const a = document.createElement("a");
         a.href = url;
         a.download = attachment.originalName;

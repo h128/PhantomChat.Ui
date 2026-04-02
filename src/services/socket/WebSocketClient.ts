@@ -119,7 +119,7 @@ export class WebSocketClient {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
-    this.listeners.get(event)!.add(callback as EventCallback);
+    this.listeners.get(event)!.add(callback as unknown as EventCallback);
   }
 
   public off<T extends SocketEvent["event_name"]>(
@@ -127,7 +127,7 @@ export class WebSocketClient {
     callback: EventCallback<T>,
   ) {
     if (this.listeners.has(event)) {
-      this.listeners.get(event)!.delete(callback as EventCallback);
+      this.listeners.get(event)!.delete(callback as unknown as EventCallback);
     }
   }
 

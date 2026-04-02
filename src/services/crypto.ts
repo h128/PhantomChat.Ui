@@ -16,6 +16,7 @@ function deriveKey(roomKey: string): Uint8Array {
   return sodium.crypto_generichash(
     sodium.crypto_secretbox_KEYBYTES,
     sodium.from_string(roomKey),
+    null,
   );
 }
 

@@ -42,7 +42,7 @@ export async function uploadFile(
         "x-room-name": roomName,
         "x-user-uuid": userUuid,
       },
-      body: data,
+      body: new Blob([new Uint8Array(data)]),
     },
   );
   if (!res.ok) {

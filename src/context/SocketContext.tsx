@@ -19,16 +19,16 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   useEffect(() => {
-    // React state sink for the state machine
-    client.on("state_changed", (newState: SocketState) => {
+    const handler = (newState: SocketState) => {
       setState(newState);
-    });
+    };
 
+    client.on("state_changed", handler);
     client.connect();
 
-    // Strict Cleanup Rule on Unmount
     return () => {
-      client.destroy();
+      client.off("state_changed", handler);
+      client.disconnect();
     };
   }, [client]);
 
