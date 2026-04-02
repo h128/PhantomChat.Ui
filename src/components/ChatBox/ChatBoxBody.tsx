@@ -40,7 +40,9 @@ function ImageAttachment({
       ? attachment.thumbnailFile
       : attachment.fileName;
     downloadFile(roomName, thumbName)
-      .then((data) => isEncryptionEnabled() ? decryptFile(data, roomKey) : data)
+      .then((data) =>
+        isEncryptionEnabled() ? decryptFile(data, roomKey) : data,
+      )
       .then((decrypted) => {
         if (!cancelled) {
           setThumbUrl(
@@ -70,7 +72,9 @@ function ImageAttachment({
 
     setLoadingFull(true);
     const result = await downloadFile(roomName, attachment.fileName)
-      .then((data) => isEncryptionEnabled() ? decryptFile(data, roomKey) : data)
+      .then((data) =>
+        isEncryptionEnabled() ? decryptFile(data, roomKey) : data,
+      )
       .then((decrypted) =>
         URL.createObjectURL(new Blob([new Uint8Array(decrypted)])),
       )
@@ -148,7 +152,9 @@ function FileAttachmentCard({
   const handleDownload = async () => {
     setDownloading(true);
     await downloadFile(roomName, attachment.fileName)
-      .then((data) => isEncryptionEnabled() ? decryptFile(data, roomKey) : data)
+      .then((data) =>
+        isEncryptionEnabled() ? decryptFile(data, roomKey) : data,
+      )
       .then((decrypted) => {
         const url = URL.createObjectURL(new Blob([new Uint8Array(decrypted)]));
         const a = document.createElement("a");
