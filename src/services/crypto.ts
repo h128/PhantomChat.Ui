@@ -1,5 +1,9 @@
 import sodium from "libsodium-wrappers";
 
+export function isEncryptionEnabled(): boolean {
+  return import.meta.env.VITE_ENCRYPT_FILES === "true";
+}
+
 let ready: Promise<void> | null = null;
 
 function ensureReady(): Promise<void> {

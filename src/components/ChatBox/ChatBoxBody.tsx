@@ -8,7 +8,7 @@ import {
   selectRoomKey,
 } from "../../features/chat/chatSlice";
 import type { FileAttachment } from "../../features/chat/chatSlice";
-import { decryptFile } from "../../services/crypto";
+import { decryptFile, isEncryptionEnabled } from "../../services/crypto";
 import { downloadFile } from "../../services/fileUpload";
 import { useChatBox } from "./ChatBoxContext";
 
@@ -40,7 +40,7 @@ function ImageAttachment({
       ? attachment.thumbnailFile
       : attachment.fileName;
     downloadFile(roomName, thumbName)
-      .then((encrypted) => decryptFile(encrypted, roomKey))
+      .then((data) => isEncryptionEnabled() ? decryptFile(data, roomKey) : data)
       .then((decrypted) => {
         if (!cancelled) {
           setThumbUrl(
@@ -70,7 +70,7 @@ function ImageAttachment({
 
     setLoadingFull(true);
     const result = await downloadFile(roomName, attachment.fileName)
-      .then((encrypted) => decryptFile(encrypted, roomKey))
+      .then((data) => isEncryptionEnabled() ? decryptFile(data, roomKey) : data)
       .then((decrypted) =>
         URL.createObjectURL(new Blob([new Uint8Array(decrypted)])),
       )
@@ -148,7 +148,7 @@ function FileAttachmentCard({
   const handleDownload = async () => {
     setDownloading(true);
     await downloadFile(roomName, attachment.fileName)
-      .then((encrypted) => decryptFile(encrypted, roomKey))
+      .then((data) => isEncryptionEnabled() ? decryptFile(data, roomKey) : data)
       .then((decrypted) => {
         const url = URL.createObjectURL(new Blob([new Uint8Array(decrypted)]));
         const a = document.createElement("a");

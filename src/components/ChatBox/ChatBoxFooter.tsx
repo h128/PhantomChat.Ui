@@ -11,7 +11,7 @@ import {
 } from "../../features/chat/chatSlice";
 import type { FileAttachment } from "../../features/chat/chatSlice";
 import { useSocketCommand } from "../../hooks/useSocket";
-import { encryptFile } from "../../services/crypto";
+import { encryptFile, isEncryptionEnabled } from "../../services/crypto";
 import {
   createThumbnail,
   generateFileName,
@@ -38,14 +38,15 @@ async function processFileUpload(
     const thumbnailBytes = await createThumbnail(file);
     const originalBytes = new Uint8Array(await file.arrayBuffer());
 
-    const [encryptedThumb, encryptedOriginal] = await Promise.all([
-      encryptFile(thumbnailBytes, roomKey),
-      encryptFile(originalBytes, roomKey),
+    const encrypt = isEncryptionEnabled();
+    const [processedThumb, processedOriginal] = await Promise.all([
+      encrypt ? encryptFile(thumbnailBytes, roomKey) : thumbnailBytes,
+      encrypt ? encryptFile(originalBytes, roomKey) : originalBytes,
     ]);
 
     await Promise.all([
-      uploadFile(encryptedThumb, thumbnailFileName, activeRoomId, userId),
-      uploadFile(encryptedOriginal, originalFileName, activeRoomId, userId),
+      uploadFile(processedThumb, thumbnailFileName, activeRoomId, userId),
+      uploadFile(processedOriginal, originalFileName, activeRoomId, userId),
     ]);
 
     return {
@@ -58,8 +59,10 @@ async function processFileUpload(
 
   const fileName = generateFileName(userId, ext, false);
   const fileBytes = new Uint8Array(await file.arrayBuffer());
-  const encrypted = await encryptFile(fileBytes, roomKey);
-  await uploadFile(encrypted, fileName, activeRoomId, userId);
+  const processed = isEncryptionEnabled()
+    ? await encryptFile(fileBytes, roomKey)
+    : fileBytes;
+  await uploadFile(processed, fileName, activeRoomId, userId);
 
   return {
     fileName,
