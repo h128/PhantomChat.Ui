@@ -12,6 +12,7 @@ import {
 import type { FileAttachment } from "../../features/chat/chatSlice";
 import { useSocketCommand } from "../../hooks/useSocket";
 import { encryptFile, isEncryptionEnabled } from "../../services/crypto";
+import { generateUUID } from "../../utils/uuid";
 import {
   createThumbnail,
   generateFileName,
@@ -122,7 +123,7 @@ export function ChatBoxFooter() {
           fileMessageReceived({
             roomId: activeRoomId,
             message: {
-              id: crypto.randomUUID(),
+              id: generateUUID(),
               senderId: userId,
               senderName: getPersistentUserName(),
               content: "",

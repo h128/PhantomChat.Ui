@@ -5,6 +5,7 @@ import type {
   SocketEvent,
 } from "./types";
 import { SocketTimeoutError, SocketDisconnectedError } from "./errors";
+import { generateUUID } from "../../utils/uuid";
 
 // Typed Event Emitter callback
 export type EventCallback<
@@ -83,7 +84,7 @@ export class WebSocketClient {
     }
 
     // Short, simple ID (like "new_uuid" in docs) to ensure C++ backend parsing success
-    const request_uuid = crypto.randomUUID();
+    const request_uuid = generateUUID();
 
     // Strictly ordered object construction
     const request = {

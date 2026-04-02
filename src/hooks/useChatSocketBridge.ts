@@ -6,6 +6,7 @@ import {
   selectActiveRoomId,
 } from "../features/chat/chatSlice";
 import { getPersistentUserId } from "../utils/user";
+import { generateUUID } from "../utils/uuid";
 import type { ChatMessage } from "../features/chat/chatSlice";
 import type {
   FileUploadedPayload,
@@ -32,7 +33,7 @@ export function useChatSocketBridge() {
     content: string,
   ) => {
     const message: ChatMessage = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       senderId,
       senderName,
       content,
@@ -92,7 +93,7 @@ export function useChatSocketBridge() {
 
       const thumbnailFile = fileName.replace("_poster", "");
       const message: ChatMessage = {
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         senderId: payload.user_uuid,
         senderName: formatDisplayName(payload.user_uuid),
         content: "",
@@ -112,7 +113,7 @@ export function useChatSocketBridge() {
       );
     } else {
       const message: ChatMessage = {
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         senderId: payload.user_uuid,
         senderName: formatDisplayName(payload.user_uuid),
         content: "",
