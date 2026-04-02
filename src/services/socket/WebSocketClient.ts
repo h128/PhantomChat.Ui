@@ -180,8 +180,9 @@ export class WebSocketClient {
 
       // Discriminator: Push Events (Explicit event_name)
       if (data.event_name) {
-        // The server sends data fields at the top level, not in a 'payload' property
-        this.emit(data.event_name, data);
+        // Strip event_name before emitting so the payload matches the declared type contract
+        const { event_name, ...payload } = data;
+        this.emit(event_name, payload);
         return;
       }
 
