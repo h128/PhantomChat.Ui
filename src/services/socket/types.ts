@@ -9,7 +9,7 @@ export type SocketState =
 export type CommandRequest = {
   request_uuid: string;
   command: number;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 export type CommandResponse = {
@@ -17,7 +17,7 @@ export type CommandResponse = {
   status: number; // 0 = success
   message?: string;
   error?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 export type RoomResponse = CommandResponse & {
@@ -51,13 +51,13 @@ export type SocketEvent =
   | { event_name: "NewMessageReceived"; payload: NewMessagePayload }
   | { event_name: "UserEnteredRoom"; payload: UserEnteredPayload }
   | { event_name: "FileUploaded"; payload: FileUploadedPayload }
-  | { event_name: "user_joined"; payload: any }
+  | { event_name: "user_joined"; payload: unknown }
   | { event_name: "room_created"; payload: RoomResponse }
-  | { event_name: "balloon_received"; payload: any }
+  | { event_name: "balloon_received"; payload: unknown }
   | { event_name: "state_changed"; payload: SocketState };
 
 export type PendingRequest = {
-  resolve: (value: any) => void;
-  reject: (reason: any) => void;
+  resolve: (value: CommandResponse) => void;
+  reject: (reason: Error) => void;
   timeoutId: ReturnType<typeof setTimeout>;
 };

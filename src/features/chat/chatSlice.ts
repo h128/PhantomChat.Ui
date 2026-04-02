@@ -45,8 +45,6 @@ export const presenceLabels: Record<PresenceMode, string> = {
   quiet: "Quiet Hours",
 };
 
-
-
 const initialState: ChatState = {
   presenceMode: "focused",
   activeRoomId: "launch-pad",

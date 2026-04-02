@@ -1,5 +1,4 @@
-const BASE_URL =
-  import.meta.env.VITE_HTTP_URL || "http://89.167.104.26:8080";
+const BASE_URL = import.meta.env.VITE_HTTP_URL || "http://89.167.104.26:8080";
 
 const THUMBNAIL_MAX_WIDTH = 200;
 

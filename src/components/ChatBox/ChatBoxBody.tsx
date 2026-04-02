@@ -91,7 +91,9 @@ function ImageAttachment({
           <div
             className={clsx(
               "flex h-24 w-36 items-center justify-center rounded-lg text-xs",
-              isDark ? "bg-white/5 text-slate-500" : "bg-slate-100 text-slate-400",
+              isDark
+                ? "bg-white/5 text-slate-500"
+                : "bg-slate-100 text-slate-400",
             )}
           >
             Loading...

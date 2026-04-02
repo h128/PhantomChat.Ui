@@ -26,23 +26,25 @@ export function useChatSocketBridge() {
 
   // 2. Consolidated Message Handler
   const handleIncomingMessage = (
-    roomId: string | undefined, 
-    senderId: string, 
-    senderName: string, 
-    content: string
+    roomId: string | undefined,
+    senderId: string,
+    senderName: string,
+    content: string,
   ) => {
     const message: ChatMessage = {
-      id: crypto.randomUUID(), 
+      id: crypto.randomUUID(),
       senderId,
       senderName,
       content,
       timestamp: new Date().toISOString(),
     };
 
-    dispatch(messageReceived({ 
-      roomId: roomId || activeRoomId || "general", 
-      message 
-    }));
+    dispatch(
+      messageReceived({
+        roomId: roomId || activeRoomId || "general",
+        message,
+      }),
+    );
   };
 
   // 3. New Message Logic
@@ -53,7 +55,7 @@ export function useChatSocketBridge() {
       payload.room_name,
       payload.sender_uuid || "system",
       payload.sender_name || formatDisplayName(payload.sender_uuid),
-      payload.message || ""
+      payload.message || "",
     );
   });
 

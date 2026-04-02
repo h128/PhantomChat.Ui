@@ -36,7 +36,8 @@ export function MeetingRoomPage() {
 
   // 1. Immediate sync of activeRoomId and Join Room
   useEffect(() => {
-    if (!roomName || socketState !== "connected" || hasJoinedRef.current) return;
+    if (!roomName || socketState !== "connected" || hasJoinedRef.current)
+      return;
 
     dispatch(setActiveRoom(roomName));
     hasJoinedRef.current = true;
@@ -69,9 +70,11 @@ export function MeetingRoomPage() {
 
     return () => {
       leaveTimeoutRef.current = setTimeout(() => {
-        sendCommandRef.current(SocketCommands.LEAVE_ROOM, {
-          room_name: roomName,
-        }).catch(() => {});
+        sendCommandRef
+          .current(SocketCommands.LEAVE_ROOM, {
+            room_name: roomName,
+          })
+          .catch(() => {});
       }, 100);
     };
   }, [roomName]);

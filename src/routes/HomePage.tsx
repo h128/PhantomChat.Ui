@@ -47,7 +47,7 @@ export function HomePage() {
     setIsJoining(true);
     try {
       dispatch(setRoomInfo({ key: "", status: "joining" }));
-      
+
       // Full payload as requested by user for Create/Join
       const payload = {
         command: SocketCommands.CREATE_ROOM,
