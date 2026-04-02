@@ -140,7 +140,6 @@ describe("WebSocketClient Core Infrastructure", () => {
         } as MessageEvent);
 
         expect(listener).toHaveBeenCalledWith({
-            event_name: "UserEnteredRoom",
             user_uuid: "user_2",
             room_name: "launch-pad",
         });
