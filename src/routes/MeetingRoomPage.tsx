@@ -4,11 +4,19 @@ import { useParams } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../app/hooks";
 import { ChatBox } from "../components/ChatBox";
 import { ThemeToggle } from "../components/ThemeToggle";
-import { setActiveRoom } from "../features/chat/chatSlice";
+import { setActiveRoom, setRoomInfo } from "../features/chat/chatSlice";
 import { selectResolvedTheme } from "../features/theme/themeSlice";
 import { useSocketCommand, useSocketState } from "../hooks/useSocket";
 import { SocketCommands } from "../services/socket/SocketCommands";
 import { getPersistentUserId } from "../utils/user";
+
+function normalizeMeetingName(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
 function formatRoomName(value: string) {
   return value
@@ -24,9 +32,11 @@ export function MeetingRoomPage() {
   const resolvedTheme = useAppSelector(selectResolvedTheme);
   const sendCommand = useSocketCommand();
   const socketState = useSocketState(); // Track connection state
+  const chatState = useAppSelector((state) => state.chat);
 
   const isDark = resolvedTheme === "dark";
-  const displayRoomName = formatRoomName(roomName) || "Untitled Room";
+  const normalizedRoomName = normalizeMeetingName(roomName);
+  const displayRoomName = formatRoomName(normalizedRoomName) || "Untitled Room";
 
   const hasJoinedRef = useRef(false);
   const sendCommandRef = useRef(sendCommand);
@@ -36,28 +46,50 @@ export function MeetingRoomPage() {
 
   // 1. Immediate sync of activeRoomId and Join Room
   useEffect(() => {
-    if (!roomName || socketState !== "connected" || hasJoinedRef.current)
+    if (
+      !normalizedRoomName ||
+      socketState !== "connected" ||
+      hasJoinedRef.current ||
+      (chatState.activeRoomId === normalizedRoomName && chatState.roomStatus === "joined")
+    )
       return;
 
-    dispatch(setActiveRoom(roomName));
+    dispatch(setActiveRoom(normalizedRoomName));
     hasJoinedRef.current = true;
 
     const joinRoom = async () => {
       try {
+        // Step 1: Create or Initialize Room to get the room_key
+        const response = (await sendCommandRef.current(SocketCommands.CREATE_ROOM, {
+          user_uuid: getPersistentUserId(),
+          room_name: normalizedRoomName,
+          public_key: "standard-v1-key",
+        })) as any;
+
+        // Update global room info
+        dispatch(
+          setRoomInfo({
+            key: response.room_key || "no-key",
+            status: "joined",
+          })
+        );
+
+        // Step 2: Send mandatory __JOIN__ message to signal presence
         await sendCommandRef.current(SocketCommands.JOIN_OR_MESSAGE, {
           user_uuid: getPersistentUserId(),
-          room_name: roomName,
+          room_name: normalizedRoomName,
           message: "__JOIN__",
         });
-        console.log(`[MeetingRoom] Successfully subscribed to ${roomName}`);
+
+        console.log(`[MeetingRoom] Successfully initialized and joined: ${normalizedRoomName}`);
       } catch (err) {
-        console.error(`[MeetingRoom] Failed to subscribe to ${roomName}:`, err);
+        console.error(`[MeetingRoom] Failed to initialize ${normalizedRoomName}:`, err);
         hasJoinedRef.current = false;
       }
     };
 
     joinRoom();
-  }, [roomName, dispatch, socketState]);
+  }, [normalizedRoomName, dispatch, socketState, chatState.activeRoomId, chatState.roomStatus]);
 
   // 2. Lifecycle adapter: Leave ONLY on actual unmount
   const leaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
