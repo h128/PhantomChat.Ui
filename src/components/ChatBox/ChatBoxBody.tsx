@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import { Download, FileIcon, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useAppSelector } from "../../app/hooks";
 import {
   selectActiveRoomId,
@@ -10,6 +11,7 @@ import {
 import type { FileAttachment } from "../../features/chat/chatSlice";
 import { decryptFile, isEncryptionEnabled } from "../../services/crypto";
 import { downloadFile } from "../../services/fileUpload";
+import { getPersistentUserId } from "../../utils/user";
 import { useChatBox } from "./ChatBoxContext";
 
 function formatTime(isoString: string) {
@@ -52,6 +54,7 @@ function ImageAttachment({
       })
       .catch((err) => {
         console.error("Failed to load thumbnail:", err);
+        toast.error("Failed to load image preview.");
       });
     return () => {
       cancelled = true;
@@ -80,6 +83,7 @@ function ImageAttachment({
       )
       .catch((err) => {
         console.error("Failed to load full image:", err);
+        toast.error("Failed to load full image.");
         return null;
       });
     if (result) setFullUrl(result);
@@ -165,6 +169,7 @@ function FileAttachmentCard({
       })
       .catch((err) => {
         console.error("Failed to download file:", err);
+        toast.error("Failed to download file.");
       });
     setDownloading(false);
   };
@@ -236,7 +241,7 @@ export function ChatBoxBody() {
   return (
     <div className="flex-1 space-y-2 overflow-y-auto px-3 py-4 sm:px-5">
       {messages.map((msg) => {
-        const isOwn = msg.senderId === "current-user";
+        const isOwn = msg.senderId === getPersistentUserId();
 
         return (
           <div

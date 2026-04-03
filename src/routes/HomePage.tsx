@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import { type FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { useAppDispatch, useAppSelector } from "../app/hooks";
 import { MeetingActionButton } from "../components/MeetingActionButton";
 import { MeetingNameInput } from "../components/MeetingNameInput";
@@ -41,7 +42,7 @@ export function HomePage() {
     }
 
     if (socketState !== "connected") {
-      alert("Socket is not connected. Please wait...");
+      toast.error("Socket is not connected. Please wait...");
       return;
     }
 
@@ -74,7 +75,7 @@ export function HomePage() {
     } catch (err) {
       dispatch(setRoomInfo({ key: "", status: "error" }));
       console.error("Failed to join/create room:", err);
-      alert("Failed to join or create room. Please try again.");
+      toast.error("Failed to join or create room. Please try again.");
     } finally {
       setIsJoining(false);
     }

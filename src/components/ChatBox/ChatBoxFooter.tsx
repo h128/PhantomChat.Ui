@@ -2,6 +2,7 @@ import clsx from "clsx";
 import EmojiPicker, { Theme, type EmojiClickData } from "emoji-picker-react";
 import { Paperclip, Send, Smile } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import {
   addMessage,
@@ -13,6 +14,7 @@ import {
 import type { FileAttachment } from "../../features/chat/chatSlice";
 import { useSocketCommand } from "../../hooks/useSocket";
 import { encryptFile, isEncryptionEnabled } from "../../services/crypto";
+import type { CommandResponse } from "../../services/socket/types";
 import { generateUUID } from "../../utils/uuid";
 import {
   createThumbnail,
@@ -101,22 +103,26 @@ export function ChatBoxFooter() {
     setShowEmojiPicker(false);
 
     // 2. Network Sync (Socket)
+    let response: CommandResponse | undefined;
     try {
-      const response = await sendCommand(SocketCommands.JOIN_OR_MESSAGE, {
+      response = (await sendCommand(SocketCommands.JOIN_OR_MESSAGE, {
         user_uuid: userId,
         room_name: activeRoomId,
         message: trimmed,
-      });
-
-      if (
-        (response as any)?.message
-          ?.toLowerCase()
-          .includes("already in another room")
-      ) {
-        dispatch(setRoomInfo({ key: "no-key", status: "error" }));
-      }
+      })) as CommandResponse;
     } catch (err) {
       console.error("Failed to send socket message:", err);
+      toast.error("Failed to send message. Please try again.");
+      return;
+    }
+
+    const responseMessage = response?.message?.toLowerCase();
+    if (
+      responseMessage &&
+      responseMessage.includes("already in another room")
+    ) {
+      dispatch(setRoomInfo({ key: "no-key", status: "error" }));
+      toast.error("Connection error: already in another room.");
     }
   };
 
@@ -147,6 +153,7 @@ export function ChatBoxFooter() {
       })
       .catch((err) => {
         console.error("File upload failed:", err);
+        toast.error("File upload failed. Please try again.");
       })
       .then(() => {
         setIsUploading(false);
@@ -189,7 +196,7 @@ export function ChatBoxFooter() {
       )}
     >
       {showEmojiPicker && (
-        <div ref={pickerRef} className="absolute bottom-full right-4 z-10 mb-2">
+        <div ref={pickerRef} className="absolute bottom-full left-0 z-10 mb-2">
           <EmojiPicker
             theme={isDark ? Theme.DARK : Theme.LIGHT}
             onEmojiClick={handleEmojiClick}
@@ -242,8 +249,8 @@ export function ChatBoxFooter() {
             roomStatus === "joining"
               ? "Joining Room..."
               : roomStatus === "error"
-              ? "Connection Error"
-              : "Message"
+                ? "Connection Error"
+                : "Message"
           }
           className={clsx(
             "flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400",
