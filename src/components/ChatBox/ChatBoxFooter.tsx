@@ -8,6 +8,7 @@ import {
   fileMessageReceived,
   selectActiveRoomId,
   selectRoomKey,
+  setRoomInfo,
 } from "../../features/chat/chatSlice";
 import type { FileAttachment } from "../../features/chat/chatSlice";
 import { useSocketCommand } from "../../hooks/useSocket";
@@ -83,11 +84,14 @@ export function ChatBoxFooter() {
   const dispatch = useAppDispatch();
   const activeRoomId = useAppSelector(selectActiveRoomId);
   const roomKey = useAppSelector(selectRoomKey);
+  const roomStatus = useAppSelector((state) => state.chat.roomStatus);
   const sendCommand = useSocketCommand();
+
+  const isJoined = roomStatus === "joined";
 
   const handleSend = async () => {
     const trimmed = value.trim();
-    if (!trimmed) return;
+    if (!trimmed || !isJoined) return;
 
     const userId = getPersistentUserId();
 
@@ -98,11 +102,19 @@ export function ChatBoxFooter() {
 
     // 2. Network Sync (Socket)
     try {
-      await sendCommand(SocketCommands.JOIN_OR_MESSAGE, {
+      const response = await sendCommand(SocketCommands.JOIN_OR_MESSAGE, {
         user_uuid: userId,
         room_name: activeRoomId,
         message: trimmed,
       });
+
+      if (
+        (response as any)?.message
+          ?.toLowerCase()
+          .includes("already in another room")
+      ) {
+        dispatch(setRoomInfo({ key: "no-key", status: "error" }));
+      }
     } catch (err) {
       console.error("Failed to send socket message:", err);
     }
@@ -225,9 +237,17 @@ export function ChatBoxFooter() {
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Message"
+          disabled={!isJoined}
+          placeholder={
+            roomStatus === "joining"
+              ? "Joining Room..."
+              : roomStatus === "error"
+              ? "Connection Error"
+              : "Message"
+          }
           className={clsx(
             "flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400",
+            !isJoined && "cursor-not-allowed opacity-50",
             isDark ? "text-slate-100" : "text-slate-900",
           )}
         />
@@ -235,8 +255,10 @@ export function ChatBoxFooter() {
           <button
             type="button"
             onClick={handleSend}
+            disabled={!isJoined}
             className={clsx(
               "flex h-8 w-8 items-center justify-center rounded-xl transition",
+              !isJoined && "cursor-not-allowed opacity-50",
               isDark
                 ? "bg-sky-400 text-slate-950 hover:bg-sky-300"
                 : "bg-[#3390ec] text-white hover:bg-[#2b82d9]",
@@ -247,10 +269,11 @@ export function ChatBoxFooter() {
         ) : (
           <button
             type="button"
-            disabled={isUploading}
+            disabled={isUploading || !isJoined}
             onClick={() => fileInputRef.current?.click()}
             className={clsx(
               "flex h-8 w-8 items-center justify-center rounded-xl transition",
+              (isUploading || !isJoined) && "cursor-not-allowed opacity-50",
               isUploading
                 ? isDark
                   ? "text-slate-600"

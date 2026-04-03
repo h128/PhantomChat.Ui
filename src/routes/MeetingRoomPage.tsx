@@ -50,46 +50,82 @@ export function MeetingRoomPage() {
       !normalizedRoomName ||
       socketState !== "connected" ||
       hasJoinedRef.current ||
-      (chatState.activeRoomId === normalizedRoomName && chatState.roomStatus === "joined")
+      chatState.roomStatus === "joined" ||
+      chatState.roomStatus === "joining"
     )
       return;
 
-    dispatch(setActiveRoom(normalizedRoomName));
     hasJoinedRef.current = true;
+    dispatch(setActiveRoom(normalizedRoomName));
+    dispatch(setRoomInfo({ key: "no-key", status: "joining" }));
 
-    const joinRoom = async () => {
+    const joinRoom = async (retryOnConflict = true) => {
       try {
         // Step 1: Create or Initialize Room to get the room_key
-        const response = (await sendCommandRef.current(SocketCommands.CREATE_ROOM, {
-          user_uuid: getPersistentUserId(),
-          room_name: normalizedRoomName,
-          public_key: "standard-v1-key",
-        })) as any;
+        const response = (await sendCommandRef.current(
+          SocketCommands.CREATE_ROOM,
+          {
+            user_uuid: getPersistentUserId(),
+            room_name: normalizedRoomName,
+            public_key: "standard-v1-key",
+          }
+        )) as any;
 
-        // Update global room info
-        dispatch(
-          setRoomInfo({
-            key: response.room_key || "no-key",
-            status: "joined",
-          })
-        );
+        if (response && response.status === 0) {
+          // Success
+          dispatch(
+            setRoomInfo({
+              key: response.room_key || "no-key",
+              status: "joined",
+            })
+          );
 
-        // Step 2: Send mandatory __JOIN__ message to signal presence
-        await sendCommandRef.current(SocketCommands.JOIN_OR_MESSAGE, {
-          user_uuid: getPersistentUserId(),
-          room_name: normalizedRoomName,
-          message: "__JOIN__",
-        });
+          // Step 2: Send mandatory __JOIN__ message to signal presence
+          await sendCommandRef.current(SocketCommands.JOIN_OR_MESSAGE, {
+            user_uuid: getPersistentUserId(),
+            room_name: normalizedRoomName,
+            message: "__JOIN__",
+          });
 
-        console.log(`[MeetingRoom] Successfully initialized and joined: ${normalizedRoomName}`);
+          console.log(
+            `[MeetingRoom] Successfully initialized and joined: ${normalizedRoomName}`
+          );
+        } else if (
+          response &&
+          retryOnConflict &&
+          response.message?.toLowerCase().includes("already in another room")
+        ) {
+          // Explicit cleanup if backend thinks we are still in another session
+          console.warn("[MeetingRoom] User already in another room. Forcing leave and retry...");
+          
+          await sendCommandRef.current(SocketCommands.LEAVE_ROOM, {
+            room_name: normalizedRoomName, 
+          }).catch(() => {});
+
+          // Small delay before retry
+          await new Promise(resolve => setTimeout(resolve, 200));
+          return joinRoom(false); // Retry once
+        } else {
+          dispatch(setRoomInfo({ key: "no-key", status: "error" }));
+        }
       } catch (err) {
-        console.error(`[MeetingRoom] Failed to initialize ${normalizedRoomName}:`, err);
+        console.error(
+          `[MeetingRoom] Failed to initialize ${normalizedRoomName}:`,
+          err
+        );
+        dispatch(setRoomInfo({ key: "no-key", status: "error" }));
         hasJoinedRef.current = false;
       }
     };
 
     joinRoom();
-  }, [normalizedRoomName, dispatch, socketState, chatState.activeRoomId, chatState.roomStatus]);
+  }, [
+    normalizedRoomName,
+    dispatch,
+    socketState,
+    chatState.roomStatus,
+    chatState.activeRoomId,
+  ]);
 
   // 2. Lifecycle adapter: Leave ONLY on actual unmount
   const leaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -102,14 +138,20 @@ export function MeetingRoomPage() {
 
     return () => {
       leaveTimeoutRef.current = setTimeout(() => {
+        // Clear the global room status ONLY if we are still targeting this room
+        // and haven't already moved to a "joining" state for a new room.
+        if (chatState.activeRoomId === normalizedRoomName) {
+          dispatch(setRoomInfo({ key: "no-key", status: "idle" }));
+        }
+
         sendCommandRef
           .current(SocketCommands.LEAVE_ROOM, {
-            room_name: roomName,
+            room_name: normalizedRoomName,
           })
           .catch(() => {});
       }, 100);
     };
-  }, [roomName]);
+  }, [normalizedRoomName, chatState.activeRoomId, dispatch]);
 
   return (
     <div
