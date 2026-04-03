@@ -60,19 +60,38 @@ async function joinRoom(
       });
 
       toast.success(`Joined ${displayRoomName}`);
-      console.log(`[MeetingRoom] Successfully initialized and joined: ${normalizedRoomName}`);
-    } else if (retryOnConflict && message.toLowerCase().includes("already in another room")) {
-      console.warn("[MeetingRoom] User already in another room. Forcing leave and retry...");
+      console.log(
+        `[MeetingRoom] Successfully initialized and joined: ${normalizedRoomName}`,
+      );
+    } else if (
+      retryOnConflict &&
+      message.toLowerCase().includes("already in another room")
+    ) {
+      console.warn(
+        "[MeetingRoom] User already in another room. Forcing leave and retry...",
+      );
 
-      await sendCommand(SocketCommands.LEAVE_ROOM, { room_name: normalizedRoomName }).catch(() => {});
+      await sendCommand(SocketCommands.LEAVE_ROOM, {
+        room_name: normalizedRoomName,
+      }).catch(() => {});
       await new Promise((resolve) => setTimeout(resolve, 200));
-      return joinRoom(sendCommand, dispatch, normalizedRoomName, displayRoomName, hasJoinedRef, false);
+      return joinRoom(
+        sendCommand,
+        dispatch,
+        normalizedRoomName,
+        displayRoomName,
+        hasJoinedRef,
+        false,
+      );
     } else {
       dispatch(setRoomInfo({ key: "no-key", status: "error" }));
       toast.error("Failed to join room. Please try again.");
     }
   } catch (err) {
-    console.error(`[MeetingRoom] Failed to initialize ${normalizedRoomName}:`, err);
+    console.error(
+      `[MeetingRoom] Failed to initialize ${normalizedRoomName}:`,
+      err,
+    );
     dispatch(setRoomInfo({ key: "no-key", status: "error" }));
     toast.error("Failed to initialize room. Please try again.");
     hasJoinedRef.current = false;
@@ -111,7 +130,13 @@ export function MeetingRoomPage() {
     hasJoinedRef.current = true;
     dispatch(setActiveRoom(normalizedRoomName));
     dispatch(setRoomInfo({ key: "no-key", status: "joining" }));
-    joinRoom(sendCommandRef.current, dispatch, normalizedRoomName, displayRoomName, hasJoinedRef);
+    joinRoom(
+      sendCommandRef.current,
+      dispatch,
+      normalizedRoomName,
+      displayRoomName,
+      hasJoinedRef,
+    );
   }, [
     normalizedRoomName,
     displayRoomName,

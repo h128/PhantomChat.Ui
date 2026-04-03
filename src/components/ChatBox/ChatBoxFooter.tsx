@@ -103,24 +103,26 @@ export function ChatBoxFooter() {
     setShowEmojiPicker(false);
 
     // 2. Network Sync (Socket)
+    let response: CommandResponse | undefined;
     try {
-      const response = await sendCommand(SocketCommands.JOIN_OR_MESSAGE, {
+      response = (await sendCommand(SocketCommands.JOIN_OR_MESSAGE, {
         user_uuid: userId,
         room_name: activeRoomId,
         message: trimmed,
-      });
-
-      if (
-        (response as CommandResponse)?.message
-          ?.toLowerCase()
-          .includes("already in another room")
-      ) {
-        dispatch(setRoomInfo({ key: "no-key", status: "error" }));
-        toast.error("Connection error: already in another room.");
-      }
+      })) as CommandResponse;
     } catch (err) {
       console.error("Failed to send socket message:", err);
       toast.error("Failed to send message. Please try again.");
+      return;
+    }
+
+    const responseMessage = response?.message?.toLowerCase();
+    if (
+      responseMessage &&
+      responseMessage.includes("already in another room")
+    ) {
+      dispatch(setRoomInfo({ key: "no-key", status: "error" }));
+      toast.error("Connection error: already in another room.");
     }
   };
 
