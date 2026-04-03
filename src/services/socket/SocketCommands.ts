@@ -1,6 +1,6 @@
 /**
  * WebSocket Command Protocol
- * 
+ *
  * Based on the backend implementation at ws://89.167.104.26:8080/room
  */
 export const SocketCommands = {
@@ -17,4 +17,5 @@ export const SocketCommands = {
   HEARTBEAT: 0,
 } as const;
 
-export type SocketCommand = typeof SocketCommands[keyof typeof SocketCommands];
+export type SocketCommand =
+  (typeof SocketCommands)[keyof typeof SocketCommands];

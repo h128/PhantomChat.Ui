@@ -1,10 +1,16 @@
-import type { SocketState, CommandResponse, PendingRequest, SocketEvent } from "./types";
+import type {
+  SocketState,
+  CommandResponse,
+  PendingRequest,
+  SocketEvent,
+} from "./types";
 import { SocketTimeoutError, SocketDisconnectedError } from "./errors";
+import { generateUUID } from "../../utils/uuid";
 
 // Typed Event Emitter callback
-export type EventCallback<T extends SocketEvent["event_name"] = any> = (
-  payload: Extract<SocketEvent, { event_name: T }>["payload"],
-) => void;
+export type EventCallback<
+  T extends SocketEvent["event_name"] = SocketEvent["event_name"],
+> = (payload: Extract<SocketEvent, { event_name: T }>["payload"]) => void;
 
 export class WebSocketClient {
   private url: string;
@@ -13,7 +19,7 @@ export class WebSocketClient {
 
   // Maps & Timers
   private pendingRequests = new Map<string, PendingRequest>();
-  private listeners = new Map<string, Set<EventCallback<any>>>();
+  private listeners = new Map<string, Set<EventCallback>>();
 
   // Reconnect Config
   private reconnectAttempts = 0;
@@ -51,13 +57,13 @@ export class WebSocketClient {
 
   public disconnect() {
     // Graceful intentional disconnect (prevents auto-reconnect)
-    this.cleanup(true);
+    this.cleanup();
     this.updateState("disconnected");
   }
 
   public destroy() {
     // Complete teardown (unmount/logout scenario)
-    this.cleanup(true);
+    this.cleanup();
     this.listeners.clear();
   }
 
@@ -71,14 +77,14 @@ export class WebSocketClient {
    */
   public async sendRequest(
     command: number,
-    payload: Record<string, any> = {},
-  ): Promise<any> {
+    payload: Record<string, unknown> = {},
+  ): Promise<CommandResponse> {
     if (this.state !== "connected" || !this.ws) {
       throw new SocketDisconnectedError("Socket is not connected");
     }
 
     // Short, simple ID (like "new_uuid" in docs) to ensure C++ backend parsing success
-    const request_uuid = crypto.randomUUID();
+    const request_uuid = generateUUID();
 
     // Strictly ordered object construction
     const request = {
@@ -114,7 +120,7 @@ export class WebSocketClient {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
-    this.listeners.get(event)!.add(callback as EventCallback<any>);
+    this.listeners.get(event)!.add(callback as unknown as EventCallback);
   }
 
   public off<T extends SocketEvent["event_name"]>(
@@ -122,7 +128,7 @@ export class WebSocketClient {
     callback: EventCallback<T>,
   ) {
     if (this.listeners.has(event)) {
-      this.listeners.get(event)!.delete(callback as EventCallback<any>);
+      this.listeners.get(event)!.delete(callback as unknown as EventCallback);
     }
   }
 
@@ -195,7 +201,7 @@ export class WebSocketClient {
   }
 
   private handleClose(event: CloseEvent) {
-    this.cleanup(false); // false = accidental drop, triggering reconnect
+    this.cleanup();
 
     if (event.wasClean) {
       this.updateState("disconnected");
@@ -235,7 +241,7 @@ export class WebSocketClient {
     }
   }
 
-  private cleanup(_intentional: boolean) {
+  private cleanup() {
     // 1. Clear Infrastructure Timers
     if (this.pingInterval) clearInterval(this.pingInterval);
     if (this.pongTimeout) clearTimeout(this.pongTimeout);
