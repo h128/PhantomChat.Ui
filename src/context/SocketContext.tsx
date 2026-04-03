@@ -14,7 +14,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [state, setState] = useState<SocketState>("idle");
   const client = useMemo(() => {
-    const url = import.meta.env.VITE_WS_URL || "ws://89.167.104.26:8080/room";
+    const url = import.meta.env.VITE_WS_URL;
     return new WebSocketClient(url);
   }, []);
 

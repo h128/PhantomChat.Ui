@@ -4,11 +4,19 @@ import { useParams } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../app/hooks";
 import { ChatBox } from "../components/ChatBox";
 import { ThemeToggle } from "../components/ThemeToggle";
-import { setActiveRoom } from "../features/chat/chatSlice";
+import { setActiveRoom, setRoomInfo } from "../features/chat/chatSlice";
 import { selectResolvedTheme } from "../features/theme/themeSlice";
 import { useSocketCommand, useSocketState } from "../hooks/useSocket";
 import { SocketCommands } from "../services/socket/SocketCommands";
 import { getPersistentUserId } from "../utils/user";
+
+function normalizeMeetingName(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
 function formatRoomName(value: string) {
   return value
@@ -24,9 +32,11 @@ export function MeetingRoomPage() {
   const resolvedTheme = useAppSelector(selectResolvedTheme);
   const sendCommand = useSocketCommand();
   const socketState = useSocketState(); // Track connection state
+  const chatState = useAppSelector((state) => state.chat);
 
   const isDark = resolvedTheme === "dark";
-  const displayRoomName = formatRoomName(roomName) || "Untitled Room";
+  const normalizedRoomName = normalizeMeetingName(roomName);
+  const displayRoomName = formatRoomName(normalizedRoomName) || "Untitled Room";
 
   const hasJoinedRef = useRef(false);
   const sendCommandRef = useRef(sendCommand);
@@ -36,28 +46,86 @@ export function MeetingRoomPage() {
 
   // 1. Immediate sync of activeRoomId and Join Room
   useEffect(() => {
-    if (!roomName || socketState !== "connected" || hasJoinedRef.current)
+    if (
+      !normalizedRoomName ||
+      socketState !== "connected" ||
+      hasJoinedRef.current ||
+      chatState.roomStatus === "joined" ||
+      chatState.roomStatus === "joining"
+    )
       return;
 
-    dispatch(setActiveRoom(roomName));
     hasJoinedRef.current = true;
+    dispatch(setActiveRoom(normalizedRoomName));
+    dispatch(setRoomInfo({ key: "no-key", status: "joining" }));
 
-    const joinRoom = async () => {
+    const joinRoom = async (retryOnConflict = true) => {
       try {
-        await sendCommandRef.current(SocketCommands.JOIN_OR_MESSAGE, {
-          user_uuid: getPersistentUserId(),
-          room_name: roomName,
-          message: "__JOIN__",
-        });
-        console.log(`[MeetingRoom] Successfully subscribed to ${roomName}`);
+        // Step 1: Create or Initialize Room to get the room_key
+        const response = (await sendCommandRef.current(
+          SocketCommands.CREATE_ROOM,
+          {
+            user_uuid: getPersistentUserId(),
+            room_name: normalizedRoomName,
+            public_key: "standard-v1-key",
+          }
+        )) as any;
+
+        if (response && response.status === 0) {
+          // Success
+          dispatch(
+            setRoomInfo({
+              key: response.room_key || "no-key",
+              status: "joined",
+            })
+          );
+
+          // Step 2: Send mandatory __JOIN__ message to signal presence
+          await sendCommandRef.current(SocketCommands.JOIN_OR_MESSAGE, {
+            user_uuid: getPersistentUserId(),
+            room_name: normalizedRoomName,
+            message: "__JOIN__",
+          });
+
+          console.log(
+            `[MeetingRoom] Successfully initialized and joined: ${normalizedRoomName}`
+          );
+        } else if (
+          response &&
+          retryOnConflict &&
+          response.message?.toLowerCase().includes("already in another room")
+        ) {
+          // Explicit cleanup if backend thinks we are still in another session
+          console.warn("[MeetingRoom] User already in another room. Forcing leave and retry...");
+          
+          await sendCommandRef.current(SocketCommands.LEAVE_ROOM, {
+            room_name: normalizedRoomName, 
+          }).catch(() => {});
+
+          // Small delay before retry
+          await new Promise(resolve => setTimeout(resolve, 200));
+          return joinRoom(false); // Retry once
+        } else {
+          dispatch(setRoomInfo({ key: "no-key", status: "error" }));
+        }
       } catch (err) {
-        console.error(`[MeetingRoom] Failed to subscribe to ${roomName}:`, err);
+        console.error(
+          `[MeetingRoom] Failed to initialize ${normalizedRoomName}:`,
+          err
+        );
+        dispatch(setRoomInfo({ key: "no-key", status: "error" }));
         hasJoinedRef.current = false;
       }
     };
 
     joinRoom();
-  }, [roomName, dispatch, socketState]);
+  }, [
+    normalizedRoomName,
+    dispatch,
+    socketState,
+    chatState.roomStatus,
+    chatState.activeRoomId,
+  ]);
 
   // 2. Lifecycle adapter: Leave ONLY on actual unmount
   const leaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -70,14 +138,20 @@ export function MeetingRoomPage() {
 
     return () => {
       leaveTimeoutRef.current = setTimeout(() => {
+        // Clear the global room status ONLY if we are still targeting this room
+        // and haven't already moved to a "joining" state for a new room.
+        if (chatState.activeRoomId === normalizedRoomName) {
+          dispatch(setRoomInfo({ key: "no-key", status: "idle" }));
+        }
+
         sendCommandRef
           .current(SocketCommands.LEAVE_ROOM, {
-            room_name: roomName,
+            room_name: normalizedRoomName,
           })
           .catch(() => {});
       }, 100);
     };
-  }, [roomName]);
+  }, [normalizedRoomName, chatState.activeRoomId, dispatch]);
 
   return (
     <div
