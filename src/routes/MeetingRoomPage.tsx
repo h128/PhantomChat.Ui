@@ -28,6 +28,57 @@ function formatRoomName(value: string) {
     .join(" ");
 }
 
+type SendCommand = ReturnType<typeof useSocketCommand>;
+type Dispatch = ReturnType<typeof useAppDispatch>;
+
+async function joinRoom(
+  sendCommand: SendCommand,
+  dispatch: Dispatch,
+  normalizedRoomName: string,
+  displayRoomName: string,
+  hasJoinedRef: React.MutableRefObject<boolean>,
+  retryOnConflict = true,
+): Promise<void> {
+  try {
+    const response = (await sendCommand(SocketCommands.CREATE_ROOM, {
+      user_uuid: getPersistentUserId(),
+      room_name: normalizedRoomName,
+      public_key: "standard-v1-key",
+    })) as CommandResponse;
+
+    const status = response.status;
+    const roomKey = response.room_key as string | undefined;
+    const message = response.message ?? "";
+
+    if (status === 0) {
+      dispatch(setRoomInfo({ key: roomKey ?? "no-key", status: "joined" }));
+
+      await sendCommand(SocketCommands.JOIN_OR_MESSAGE, {
+        user_uuid: getPersistentUserId(),
+        room_name: normalizedRoomName,
+        message: "__JOIN__",
+      });
+
+      toast.success(`Joined ${displayRoomName}`);
+      console.log(`[MeetingRoom] Successfully initialized and joined: ${normalizedRoomName}`);
+    } else if (retryOnConflict && message.toLowerCase().includes("already in another room")) {
+      console.warn("[MeetingRoom] User already in another room. Forcing leave and retry...");
+
+      await sendCommand(SocketCommands.LEAVE_ROOM, { room_name: normalizedRoomName }).catch(() => {});
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      return joinRoom(sendCommand, dispatch, normalizedRoomName, displayRoomName, hasJoinedRef, false);
+    } else {
+      dispatch(setRoomInfo({ key: "no-key", status: "error" }));
+      toast.error("Failed to join room. Please try again.");
+    }
+  } catch (err) {
+    console.error(`[MeetingRoom] Failed to initialize ${normalizedRoomName}:`, err);
+    dispatch(setRoomInfo({ key: "no-key", status: "error" }));
+    toast.error("Failed to initialize room. Please try again.");
+    hasJoinedRef.current = false;
+  }
+}
+
 export function MeetingRoomPage() {
   const { roomName = "" } = useParams();
   const dispatch = useAppDispatch();
@@ -60,74 +111,7 @@ export function MeetingRoomPage() {
     hasJoinedRef.current = true;
     dispatch(setActiveRoom(normalizedRoomName));
     dispatch(setRoomInfo({ key: "no-key", status: "joining" }));
-
-    const joinRoom = async (retryOnConflict = true) => {
-      try {
-        // Step 1: Create or Initialize Room to get the room_key
-        const response = (await sendCommandRef.current(
-          SocketCommands.CREATE_ROOM,
-          {
-            user_uuid: getPersistentUserId(),
-            room_name: normalizedRoomName,
-            public_key: "standard-v1-key",
-          },
-        )) as CommandResponse;
-
-        if (response && response.status === 0) {
-          // Success
-          dispatch(
-            setRoomInfo({
-              key: response.room_key || "no-key",
-              status: "joined",
-            }),
-          );
-
-          // Step 2: Send mandatory __JOIN__ message to signal presence
-          await sendCommandRef.current(SocketCommands.JOIN_OR_MESSAGE, {
-            user_uuid: getPersistentUserId(),
-            room_name: normalizedRoomName,
-            message: "__JOIN__",
-          });
-
-          toast.success(`Joined ${displayRoomName}`);
-          console.log(
-            `[MeetingRoom] Successfully initialized and joined: ${normalizedRoomName}`,
-          );
-        } else if (
-          response &&
-          retryOnConflict &&
-          response.message?.toLowerCase().includes("already in another room")
-        ) {
-          // Explicit cleanup if backend thinks we are still in another session
-          console.warn(
-            "[MeetingRoom] User already in another room. Forcing leave and retry...",
-          );
-
-          await sendCommandRef
-            .current(SocketCommands.LEAVE_ROOM, {
-              room_name: normalizedRoomName,
-            })
-            .catch(() => {});
-
-          // Small delay before retry
-          await new Promise((resolve) => setTimeout(resolve, 200));
-          return joinRoom(false); // Retry once
-        } else {
-          dispatch(setRoomInfo({ key: "no-key", status: "error" }));
-          toast.error("Failed to join room. Please try again.");
-        }
-      } catch (err) {
-        console.error(
-          `[MeetingRoom] Failed to initialize ${normalizedRoomName}:`,
-          err,
-        );
-        dispatch(setRoomInfo({ key: "no-key", status: "error" }));
-        toast.error("Failed to initialize room. Please try again.");
-        hasJoinedRef.current = false;
-      }
-    };
-
-    joinRoom();
+    joinRoom(sendCommandRef.current, dispatch, normalizedRoomName, displayRoomName, hasJoinedRef);
   }, [
     normalizedRoomName,
     displayRoomName,
