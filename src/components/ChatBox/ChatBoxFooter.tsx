@@ -196,7 +196,7 @@ export function ChatBoxFooter() {
       )}
     >
       {showEmojiPicker && (
-        <div ref={pickerRef} className="absolute bottom-full right-4 z-10 mb-2">
+        <div ref={pickerRef} className="absolute bottom-full left-0 z-10 mb-2">
           <EmojiPicker
             theme={isDark ? Theme.DARK : Theme.LIGHT}
             onEmojiClick={handleEmojiClick}
