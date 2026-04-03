@@ -11,6 +11,7 @@ import {
 import type { FileAttachment } from "../../features/chat/chatSlice";
 import { decryptFile, isEncryptionEnabled } from "../../services/crypto";
 import { downloadFile } from "../../services/fileUpload";
+import { getPersistentUserId } from "../../utils/user";
 import { useChatBox } from "./ChatBoxContext";
 
 function formatTime(isoString: string) {
@@ -240,7 +241,7 @@ export function ChatBoxBody() {
   return (
     <div className="flex-1 space-y-2 overflow-y-auto px-3 py-4 sm:px-5">
       {messages.map((msg) => {
-        const isOwn = msg.senderId === "current-user";
+        const isOwn = msg.senderId === getPersistentUserId();
 
         return (
           <div
