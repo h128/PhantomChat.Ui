@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import { useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
+import { toast } from "sonner";
 import { useAppDispatch, useAppSelector } from "../app/hooks";
 import { ChatBox } from "../components/ChatBox";
 import { ThemeToggle } from "../components/ThemeToggle";
@@ -8,6 +9,7 @@ import { setActiveRoom, setRoomInfo } from "../features/chat/chatSlice";
 import { selectResolvedTheme } from "../features/theme/themeSlice";
 import { useSocketCommand, useSocketState } from "../hooks/useSocket";
 import { SocketCommands } from "../services/socket/SocketCommands";
+import type { CommandResponse } from "../services/socket/types";
 import { getPersistentUserId } from "../utils/user";
 
 function normalizeMeetingName(value: string) {
@@ -68,8 +70,8 @@ export function MeetingRoomPage() {
             user_uuid: getPersistentUserId(),
             room_name: normalizedRoomName,
             public_key: "standard-v1-key",
-          }
-        )) as any;
+          },
+        )) as CommandResponse;
 
         if (response && response.status === 0) {
           // Success
@@ -77,7 +79,7 @@ export function MeetingRoomPage() {
             setRoomInfo({
               key: response.room_key || "no-key",
               status: "joined",
-            })
+            }),
           );
 
           // Step 2: Send mandatory __JOIN__ message to signal presence
@@ -87,8 +89,9 @@ export function MeetingRoomPage() {
             message: "__JOIN__",
           });
 
+          toast.success(`Joined ${displayRoomName}`);
           console.log(
-            `[MeetingRoom] Successfully initialized and joined: ${normalizedRoomName}`
+            `[MeetingRoom] Successfully initialized and joined: ${normalizedRoomName}`,
           );
         } else if (
           response &&
@@ -96,24 +99,30 @@ export function MeetingRoomPage() {
           response.message?.toLowerCase().includes("already in another room")
         ) {
           // Explicit cleanup if backend thinks we are still in another session
-          console.warn("[MeetingRoom] User already in another room. Forcing leave and retry...");
-          
-          await sendCommandRef.current(SocketCommands.LEAVE_ROOM, {
-            room_name: normalizedRoomName, 
-          }).catch(() => {});
+          console.warn(
+            "[MeetingRoom] User already in another room. Forcing leave and retry...",
+          );
+
+          await sendCommandRef
+            .current(SocketCommands.LEAVE_ROOM, {
+              room_name: normalizedRoomName,
+            })
+            .catch(() => {});
 
           // Small delay before retry
-          await new Promise(resolve => setTimeout(resolve, 200));
+          await new Promise((resolve) => setTimeout(resolve, 200));
           return joinRoom(false); // Retry once
         } else {
           dispatch(setRoomInfo({ key: "no-key", status: "error" }));
+          toast.error("Failed to join room. Please try again.");
         }
       } catch (err) {
         console.error(
           `[MeetingRoom] Failed to initialize ${normalizedRoomName}:`,
-          err
+          err,
         );
         dispatch(setRoomInfo({ key: "no-key", status: "error" }));
+        toast.error("Failed to initialize room. Please try again.");
         hasJoinedRef.current = false;
       }
     };
@@ -121,6 +130,7 @@ export function MeetingRoomPage() {
     joinRoom();
   }, [
     normalizedRoomName,
+    displayRoomName,
     dispatch,
     socketState,
     chatState.roomStatus,

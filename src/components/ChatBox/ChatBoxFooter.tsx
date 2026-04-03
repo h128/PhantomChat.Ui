@@ -2,6 +2,7 @@ import clsx from "clsx";
 import EmojiPicker, { Theme, type EmojiClickData } from "emoji-picker-react";
 import { Paperclip, Send, Smile } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import {
   addMessage,
@@ -13,6 +14,7 @@ import {
 import type { FileAttachment } from "../../features/chat/chatSlice";
 import { useSocketCommand } from "../../hooks/useSocket";
 import { encryptFile, isEncryptionEnabled } from "../../services/crypto";
+import type { CommandResponse } from "../../services/socket/types";
 import { generateUUID } from "../../utils/uuid";
 import {
   createThumbnail,
@@ -109,14 +111,16 @@ export function ChatBoxFooter() {
       });
 
       if (
-        (response as any)?.message
+        (response as CommandResponse)?.message
           ?.toLowerCase()
           .includes("already in another room")
       ) {
         dispatch(setRoomInfo({ key: "no-key", status: "error" }));
+        toast.error("Connection error: already in another room.");
       }
     } catch (err) {
       console.error("Failed to send socket message:", err);
+      toast.error("Failed to send message. Please try again.");
     }
   };
 
@@ -147,6 +151,7 @@ export function ChatBoxFooter() {
       })
       .catch((err) => {
         console.error("File upload failed:", err);
+        toast.error("File upload failed. Please try again.");
       })
       .then(() => {
         setIsUploading(false);
@@ -242,8 +247,8 @@ export function ChatBoxFooter() {
             roomStatus === "joining"
               ? "Joining Room..."
               : roomStatus === "error"
-              ? "Connection Error"
-              : "Message"
+                ? "Connection Error"
+                : "Message"
           }
           className={clsx(
             "flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400",
