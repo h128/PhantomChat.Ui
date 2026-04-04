@@ -1,4 +1,5 @@
 import { useRef, useCallback } from "react";
+import { toast } from "sonner";
 import { useAppDispatch, useAppSelector } from "../app/hooks";
 import {
   clearCall,
@@ -37,7 +38,10 @@ export function useWebRTC() {
               sdpMid: candidate.sdpMid,
               sdpMLineIndex: candidate.sdpMLineIndex,
             },
-          }).catch(console.error);
+          }).catch((err) => {
+            toast.error("Connection issue encountered. The call might be unstable.");
+            console.error("Failed to send ICE candidate:", err);
+          });
         },
       );
     }
@@ -105,6 +109,7 @@ export function useWebRTC() {
 
       dispatch(setCallStatus({ status: "calling", isIncoming: false }));
     } catch (err) {
+      toast.error("Failed to start call. Please check your camera/microphone.");
       console.error("Failed to start call:", err);
     }
   };
@@ -130,6 +135,7 @@ export function useWebRTC() {
 
       dispatch(setCallStatus({ status: "connected" }));
     } catch (err) {
+      toast.error("Failed to accept call. Please check your camera/microphone.");
       console.error("Failed to accept call:", err);
     }
   };
