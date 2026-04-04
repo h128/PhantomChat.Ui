@@ -1,4 +1,5 @@
 import clsx from "clsx";
+import { PhoneOff, Video } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -11,6 +12,7 @@ import { useSocketCommand, useSocketState } from "../hooks/useSocket";
 import { SocketCommands } from "../services/socket/SocketCommands";
 import type { CommandResponse } from "../services/socket/types";
 import { getPersistentUserId } from "../utils/user";
+import { useWebRTC } from "../hooks/useWebRTC";
 
 function normalizeMeetingName(value: string) {
   return value
@@ -105,6 +107,10 @@ export function MeetingRoomPage() {
   const sendCommand = useSocketCommand();
   const socketState = useSocketState(); // Track connection state
   const chatState = useAppSelector((state) => state.chat);
+  const { callState, startCall, acceptCall, rejectCall, hangUp, localStream, remoteStream } = useWebRTC();
+
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
   const isDark = resolvedTheme === "dark";
   const normalizedRoomName = normalizeMeetingName(roomName);
@@ -145,6 +151,20 @@ export function MeetingRoomPage() {
     chatState.roomStatus,
     chatState.activeRoomId,
   ]);
+
+  // Handle Video Streams
+  useEffect(() => {
+    if (callState.status === "connected" || callState.status === "calling") {
+      if (localVideoRef.current && localStream) {
+        localVideoRef.current.srcObject = localStream;
+      }
+    }
+    if (callState.status === "connected") {
+      if (remoteVideoRef.current && remoteStream) {
+        remoteVideoRef.current.srcObject = remoteStream;
+      }
+    }
+  }, [callState.status, localStream, remoteStream]);
 
   // 2. Lifecycle adapter: Leave ONLY on actual unmount
   const leaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -228,7 +248,24 @@ export function MeetingRoomPage() {
               </p>
             </div>
           </div>
-          <ThemeToggle />
+
+          <div className="flex items-center gap-2">
+            {chatState.roomStatus === "joined" && callState.status === "idle" && (
+              <button
+                onClick={startCall}
+                className={clsx(
+                  "flex h-10 w-10 items-center justify-center rounded-full transition-all hover:scale-110 active:scale-95",
+                  isDark
+                    ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                    : "bg-emerald-100 text-emerald-600 hover:bg-emerald-200"
+                )}
+                title="Start Video Call"
+              >
+                <Video size={20} />
+              </button>
+            )}
+            <ThemeToggle />
+          </div>
         </header>
 
         <main className="mt-5 flex min-h-0 flex-1 flex-col">
@@ -239,6 +276,80 @@ export function MeetingRoomPage() {
           </ChatBox>
         </main>
       </div>
+
+      {/* Call Overlay */}
+      {callState.status !== "idle" && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
+          <div className={clsx(
+            "relative flex w-full max-w-2xl flex-col items-center rounded-3xl border p-8 shadow-2xl",
+            isDark ? "border-white/10 bg-slate-900" : "border-slate-200 bg-white"
+          )}>
+            <div className="mb-6 flex flex-col items-center gap-4">
+              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-sky-500/20 text-sky-500">
+                <Video size={40} />
+              </div>
+              <div className="text-center">
+                <h2 className="text-xl font-bold">
+                  {callState.status === "incoming" ? "Incoming Call" : 
+                   callState.status === "calling" ? "Calling..." : "Call Connected"}
+                </h2>
+                <p className={isDark ? "text-slate-400" : "text-slate-500"}>
+                  {callState.peerId || "Remote Peer"}
+                </p>
+              </div>
+            </div>
+
+            {callState.status === "connected" && (
+              <div className="mb-8 grid w-full grid-cols-2 gap-4">
+                <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-800 shadow-inner">
+                  <video ref={remoteVideoRef} autoPlay playsInline className="h-full w-full object-cover" />
+                  <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">Remote</div>
+                </div>
+                <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-800 shadow-inner">
+                  <video ref={localVideoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
+                  <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">Local (You)</div>
+                </div>
+              </div>
+            )}
+
+            {callState.status === "calling" && (
+              <div className="mb-8 flex w-full justify-center">
+                <div className="relative aspect-video w-64 overflow-hidden rounded-xl bg-slate-800 shadow-inner">
+                   <video ref={localVideoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
+                   <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">Preview</div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-4">
+              {callState.status === "incoming" ? (
+                <>
+                  <button
+                    onClick={() => callState.offer && acceptCall(callState.offer)}
+                    className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 transition-transform hover:scale-110 active:scale-95"
+                  >
+                    <Video size={24} />
+                  </button>
+                  <button
+                    onClick={rejectCall}
+                    className="flex h-14 w-14 items-center justify-center rounded-full bg-rose-500 text-white shadow-lg shadow-rose-500/30 transition-transform hover:scale-110 active:scale-95"
+                  >
+                    <PhoneOff size={24} />
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={hangUp}
+                  className="flex h-14 w-40 items-center justify-center gap-3 rounded-full bg-rose-500 font-semibold text-white shadow-lg shadow-rose-500/30 transition-transform hover:scale-105 active:scale-95"
+                >
+                  <PhoneOff size={20} />
+                  <span>End Call</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

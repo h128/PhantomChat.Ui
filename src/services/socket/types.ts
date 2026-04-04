@@ -47,10 +47,26 @@ export type FileUploadedPayload = {
   poster: boolean;
 };
 
+export type SignalingData = {
+  type?: "offer" | "answer";
+  sdp?: string;
+  candidate?: string;
+  sdpMid?: string;
+  sdpMLineIndex?: number;
+  usernameFragment?: string;
+};
+
+export type SignalCallRelayPayload = {
+  action: number;
+  sender_uuid: string;
+  signaling_data: SignalingData;
+};
+
 export type SocketEvent =
   | { event_name: "NewMessageReceived"; payload: NewMessagePayload }
   | { event_name: "UserEnteredRoom"; payload: UserEnteredPayload }
   | { event_name: "FileUploaded"; payload: FileUploadedPayload }
+  | { event_name: "SignalCallRelay"; payload: SignalCallRelayPayload }
   | { event_name: "user_joined"; payload: unknown }
   | { event_name: "room_created"; payload: RoomResponse }
   | { event_name: "balloon_received"; payload: unknown }

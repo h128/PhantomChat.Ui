@@ -28,6 +28,13 @@ export interface ChatMessage {
   attachment?: FileAttachment;
 }
 
+export interface CallState {
+  status: "idle" | "calling" | "incoming" | "connected";
+  peerId: string | null;
+  isIncoming: boolean;
+  offer?: RTCSessionDescriptionInit;
+}
+
 interface ChatState {
   presenceMode: PresenceMode;
   activeRoomId: string;
@@ -35,6 +42,7 @@ interface ChatState {
   messages: Record<string, ChatMessage[]>;
   roomKey: string | null;
   roomStatus: "idle" | "joining" | "joined" | "error";
+  callState: CallState;
 }
 
 const presenceOrder: PresenceMode[] = ["focused", "available", "quiet"];
@@ -74,6 +82,11 @@ const initialState: ChatState = {
   messages: {},
   roomKey: null,
   roomStatus: "idle",
+  callState: {
+    status: "idle",
+    peerId: null,
+    isIncoming: false,
+  },
 };
 
 const chatSlice = createSlice({
@@ -151,6 +164,12 @@ const chatSlice = createSlice({
       }
       state.messages[roomId].push(message);
     },
+    setCallStatus(state, action: PayloadAction<Partial<CallState>>) {
+      state.callState = { ...state.callState, ...action.payload };
+    },
+    clearCall(state) {
+      state.callState = initialState.callState;
+    },
   },
 });
 
@@ -162,6 +181,8 @@ export const {
   messageReceived,
   fileMessageReceived,
   setRoomInfo,
+  setCallStatus,
+  clearCall,
 } = chatSlice.actions;
 
 export const selectActiveRoomId = (state: RootState) => state.chat.activeRoomId;
@@ -173,5 +194,7 @@ export const selectActiveRoomMessages = (state: RootState) =>
   state.chat.messages[state.chat.activeRoomId] ?? [];
 
 export const selectRoomKey = (state: RootState) => state.chat.roomKey;
+
+export const selectCallState = (state: RootState) => state.chat.callState;
 
 export default chatSlice.reducer;
