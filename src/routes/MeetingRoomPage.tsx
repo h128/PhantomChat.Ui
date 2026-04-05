@@ -107,7 +107,15 @@ export function MeetingRoomPage() {
   const sendCommand = useSocketCommand();
   const socketState = useSocketState(); // Track connection state
   const chatState = useAppSelector((state) => state.chat);
-  const { callState, startCall, acceptCall, rejectCall, hangUp, localStream, remoteStream } = useWebRTC();
+  const {
+    callState,
+    startCall,
+    acceptCall,
+    rejectCall,
+    hangUp,
+    localStream,
+    remoteStream,
+  } = useWebRTC();
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -250,20 +258,21 @@ export function MeetingRoomPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            {chatState.roomStatus === "joined" && callState.status === "idle" && (
-              <button
-                onClick={startCall}
-                className={clsx(
-                  "flex h-10 w-10 items-center justify-center rounded-full transition-all hover:scale-110 active:scale-95",
-                  isDark
-                    ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-                    : "bg-emerald-100 text-emerald-600 hover:bg-emerald-200"
-                )}
-                title="Start Video Call"
-              >
-                <Video size={20} />
-              </button>
-            )}
+            {chatState.roomStatus === "joined" &&
+              callState.status === "idle" && (
+                <button
+                  onClick={startCall}
+                  className={clsx(
+                    "flex h-10 w-10 items-center justify-center rounded-full transition-all hover:scale-110 active:scale-95",
+                    isDark
+                      ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                      : "bg-emerald-100 text-emerald-600 hover:bg-emerald-200",
+                  )}
+                  title="Start Video Call"
+                >
+                  <Video size={20} />
+                </button>
+              )}
             <ThemeToggle />
           </div>
         </header>
@@ -280,18 +289,25 @@ export function MeetingRoomPage() {
       {/* Call Overlay */}
       {callState.status !== "idle" && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
-          <div className={clsx(
-            "relative flex w-full max-w-2xl flex-col items-center rounded-3xl border p-8 shadow-2xl",
-            isDark ? "border-white/10 bg-slate-900" : "border-slate-200 bg-white"
-          )}>
+          <div
+            className={clsx(
+              "relative flex w-full max-w-2xl flex-col items-center rounded-3xl border p-8 shadow-2xl",
+              isDark
+                ? "border-white/10 bg-slate-900"
+                : "border-slate-200 bg-white",
+            )}
+          >
             <div className="mb-6 flex flex-col items-center gap-4">
               <div className="flex h-20 w-20 items-center justify-center rounded-full bg-sky-500/20 text-sky-500">
                 <Video size={40} />
               </div>
               <div className="text-center">
                 <h2 className="text-xl font-bold">
-                  {callState.status === "incoming" ? "Incoming Call" : 
-                   callState.status === "calling" ? "Calling..." : "Call Connected"}
+                  {callState.status === "incoming"
+                    ? "Incoming Call"
+                    : callState.status === "calling"
+                      ? "Calling..."
+                      : "Call Connected"}
                 </h2>
                 <p className={isDark ? "text-slate-400" : "text-slate-500"}>
                   {callState.peerId || "Remote Peer"}
@@ -302,12 +318,27 @@ export function MeetingRoomPage() {
             {callState.status === "connected" && (
               <div className="mb-8 grid w-full grid-cols-2 gap-4">
                 <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-800 shadow-inner">
-                  <video ref={remoteVideoRef} autoPlay playsInline className="h-full w-full object-cover" />
-                  <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">Remote</div>
+                  <video
+                    ref={remoteVideoRef}
+                    autoPlay
+                    playsInline
+                    className="h-full w-full object-cover"
+                  />
+                  <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">
+                    Remote
+                  </div>
                 </div>
                 <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-800 shadow-inner">
-                  <video ref={localVideoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
-                  <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">Local (You)</div>
+                  <video
+                    ref={localVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="h-full w-full object-cover"
+                  />
+                  <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">
+                    Local (You)
+                  </div>
                 </div>
               </div>
             )}
@@ -315,8 +346,16 @@ export function MeetingRoomPage() {
             {callState.status === "calling" && (
               <div className="mb-8 flex w-full justify-center">
                 <div className="relative aspect-video w-64 overflow-hidden rounded-xl bg-slate-800 shadow-inner">
-                   <video ref={localVideoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
-                   <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">Preview</div>
+                  <video
+                    ref={localVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="h-full w-full object-cover"
+                  />
+                  <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">
+                    Preview
+                  </div>
                 </div>
               </div>
             )}
@@ -325,7 +364,9 @@ export function MeetingRoomPage() {
               {callState.status === "incoming" ? (
                 <>
                   <button
-                    onClick={() => callState.offer && acceptCall(callState.offer)}
+                    onClick={() =>
+                      callState.offer && acceptCall(callState.offer)
+                    }
                     className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 transition-transform hover:scale-110 active:scale-95"
                   >
                     <Video size={24} />

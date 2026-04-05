@@ -1,7 +1,8 @@
 import clsx from "clsx";
 import EmojiPicker, { Theme, type EmojiClickData } from "emoji-picker-react";
-import { Paperclip, Send, Smile } from "lucide-react";
+import { LogOut, Paperclip, Send, Smile } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import {
@@ -83,6 +84,7 @@ export function ChatBoxFooter() {
   const pickerRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const activeRoomId = useAppSelector(selectActiveRoomId);
   const roomKey = useAppSelector(selectRoomKey);
@@ -214,85 +216,100 @@ export function ChatBoxFooter() {
         onChange={handleFileSelect}
       />
 
-      <div
-        className={clsx(
-          "flex items-center gap-2 rounded-2xl border px-4 py-2.5",
-          isDark
-            ? "border-slate-700 bg-slate-900/80"
-            : "border-slate-200 bg-slate-50",
-        )}
-      >
-        <button
-          ref={toggleRef}
-          type="button"
-          onClick={() => setShowEmojiPicker((prev) => !prev)}
+      <div className="flex items-center gap-2">
+        <div
           className={clsx(
-            "flex h-8 w-8 items-center justify-center rounded-xl transition",
-            showEmojiPicker
-              ? isDark
-                ? "text-sky-400"
-                : "text-[#3390ec]"
-              : isDark
-                ? "text-slate-500 hover:text-slate-300"
-                : "text-slate-400 hover:text-slate-600",
+            "flex flex-1 items-center gap-2 rounded-2xl border px-4 py-2.5",
+            isDark
+              ? "border-slate-700 bg-slate-900/80"
+              : "border-slate-200 bg-slate-50",
           )}
         >
-          <Smile size={18} />
-        </button>
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={!isJoined}
-          placeholder={
-            roomStatus === "joining"
-              ? "Joining Room..."
-              : roomStatus === "error"
-                ? "Connection Error"
-                : "Message"
-          }
-          className={clsx(
-            "flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400",
-            !isJoined && "cursor-not-allowed opacity-50",
-            isDark ? "text-slate-100" : "text-slate-900",
-          )}
-        />
-        {value.trim() ? (
           <button
+            ref={toggleRef}
             type="button"
-            onClick={handleSend}
-            disabled={!isJoined}
+            onClick={() => setShowEmojiPicker((prev) => !prev)}
             className={clsx(
               "flex h-8 w-8 items-center justify-center rounded-xl transition",
-              !isJoined && "cursor-not-allowed opacity-50",
-              isDark
-                ? "bg-sky-400 text-slate-950 hover:bg-sky-300"
-                : "bg-[#3390ec] text-white hover:bg-[#2b82d9]",
-            )}
-          >
-            <Send size={16} />
-          </button>
-        ) : (
-          <button
-            type="button"
-            disabled={isUploading || !isJoined}
-            onClick={() => fileInputRef.current?.click()}
-            className={clsx(
-              "flex h-8 w-8 items-center justify-center rounded-xl transition",
-              (isUploading || !isJoined) && "cursor-not-allowed opacity-50",
-              isUploading
+              showEmojiPicker
                 ? isDark
-                  ? "text-slate-600"
-                  : "text-slate-300"
+                  ? "text-sky-400"
+                  : "text-[#3390ec]"
                 : isDark
                   ? "text-slate-500 hover:text-slate-300"
                   : "text-slate-400 hover:text-slate-600",
             )}
           >
-            <Paperclip size={18} />
+            <Smile size={18} />
           </button>
-        )}
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={!isJoined}
+            placeholder={
+              roomStatus === "joining"
+                ? "Joining Room..."
+                : roomStatus === "error"
+                  ? "Connection Error"
+                  : "Message"
+            }
+            className={clsx(
+              "flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400",
+              !isJoined && "cursor-not-allowed opacity-50",
+              isDark ? "text-slate-100" : "text-slate-900",
+            )}
+          />
+          {value.trim() ? (
+            <button
+              type="button"
+              onClick={handleSend}
+              disabled={!isJoined}
+              className={clsx(
+                "flex h-8 w-8 items-center justify-center rounded-xl transition",
+                !isJoined && "cursor-not-allowed opacity-50",
+                isDark
+                  ? "bg-sky-400 text-slate-950 hover:bg-sky-300"
+                  : "bg-[#3390ec] text-white hover:bg-[#2b82d9]",
+              )}
+            >
+              <Send size={16} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={isUploading || !isJoined}
+              onClick={() => fileInputRef.current?.click()}
+              className={clsx(
+                "flex h-8 w-8 items-center justify-center rounded-xl transition",
+                (isUploading || !isJoined) && "cursor-not-allowed opacity-50",
+                isUploading
+                  ? isDark
+                    ? "text-slate-600"
+                    : "text-slate-300"
+                  : isDark
+                    ? "text-slate-500 hover:text-slate-300"
+                    : "text-slate-400 hover:text-slate-600",
+              )}
+            >
+              <Paperclip size={18} />
+            </button>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate("/")}
+          title="Exit Room"
+          className={clsx(
+            "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition",
+            isDark
+              ? "text-slate-500 hover:bg-rose-500/10 hover:text-rose-400"
+              : "text-slate-400 hover:bg-rose-50 hover:text-rose-500",
+          )}
+        >
+          <LogOut size={18} />
+        </button>
       </div>
     </div>
   );
