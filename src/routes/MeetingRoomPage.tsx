@@ -100,6 +100,24 @@ async function joinRoom(
   }
 }
 
+const RemoteVideo = ({ stream, label = "Remote" }: { stream: MediaStream, label?: string }) => {
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    if (ref.current && stream) {
+      ref.current.srcObject = stream;
+    }
+  }, [stream]);
+
+  return (
+    <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-800 shadow-inner">
+      <video ref={ref} autoPlay playsInline className="h-full w-full object-cover" />
+      <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">
+        {label}
+      </div>
+    </div>
+  );
+};
+
 export function MeetingRoomPage() {
   const { roomName = "" } = useParams();
   const dispatch = useAppDispatch();
@@ -114,11 +132,10 @@ export function MeetingRoomPage() {
     rejectCall,
     hangUp,
     localStream,
-    remoteStream,
+    remoteStreams,
   } = useWebRTC();
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
   const isDark = resolvedTheme === "dark";
   const normalizedRoomName = normalizeMeetingName(roomName);
@@ -162,17 +179,10 @@ export function MeetingRoomPage() {
 
   // Handle Video Streams
   useEffect(() => {
-    if (callState.status === "connected" || callState.status === "calling") {
-      if (localVideoRef.current && localStream) {
-        localVideoRef.current.srcObject = localStream;
-      }
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
     }
-    if (callState.status === "connected") {
-      if (remoteVideoRef.current && remoteStream) {
-        remoteVideoRef.current.srcObject = remoteStream;
-      }
-    }
-  }, [callState.status, localStream, remoteStream]);
+  }, [localStream, callState.status]);
 
   // 2. Lifecycle adapter: Leave ONLY on actual unmount
   const leaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -317,17 +327,10 @@ export function MeetingRoomPage() {
 
             {callState.status === "connected" && (
               <div className="mb-8 grid w-full grid-cols-2 gap-4">
-                <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-800 shadow-inner">
-                  <video
-                    ref={remoteVideoRef}
-                    autoPlay
-                    playsInline
-                    className="h-full w-full object-cover"
-                  />
-                  <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">
-                    Remote
-                  </div>
-                </div>
+                {Array.from(remoteStreams.entries()).map(([peerId, stream]) => (
+                  <RemoteVideo key={peerId} stream={stream} label={`Remote (${peerId.slice(0, 4)})`} />
+                ))}
+                
                 <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-800 shadow-inner">
                   <video
                     ref={localVideoRef}
@@ -364,9 +367,7 @@ export function MeetingRoomPage() {
               {callState.status === "incoming" ? (
                 <>
                   <button
-                    onClick={() =>
-                      callState.offer && acceptCall(callState.offer)
-                    }
+                    onClick={() => acceptCall()}
                     className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 transition-transform hover:scale-110 active:scale-95"
                   >
                     <Video size={24} />

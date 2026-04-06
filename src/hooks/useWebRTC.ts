@@ -15,7 +15,7 @@ import { WebRTCService } from "../services/webrtc/WebRTCService";
 import type { SignalCallRelayPayload } from "../services/socket/types";
 import { getPersistentUserId } from "../utils/user";
 
-// Ring audio for incoming calls — /public/ring.wav
+// Ring audio for incoming calls
 let ringAudio: HTMLAudioElement | null = null;
 
 function startRinging() {
@@ -23,9 +23,7 @@ function startRinging() {
   ringAudio = new Audio("/ring.wav");
   ringAudio.loop = true;
   ringAudio.volume = 0.6;
-  ringAudio.play().catch(() => {
-    // Browser autoplay policy — user interaction required before audio can play
-  });
+  ringAudio.play().catch(() => {});
 }
 
 function stopRinging() {
@@ -36,24 +34,40 @@ function stopRinging() {
   }
 }
 
+// Multiplexing helpers
+function encodeSignal(targetUuid: string, payload: string) {
+  return `${targetUuid}|||${payload}`;
+}
+
+function decodeSignal(payload?: string) {
+  if (!payload) return null;
+  const parts = payload.split("|||");
+  if (parts.length >= 2) {
+    return { targetUuid: parts[0], realPayload: parts.slice(1).join("|||") };
+  }
+  return null;
+}
+
 export function useWebRTC() {
   const dispatch = useAppDispatch();
   const callState = useAppSelector(selectCallState);
   const sendCommand = useSocketCommand();
-  // Keep sendCommand in a ref so callbacks always use the latest version
   const sendCommandRef = useRef(sendCommand);
   useEffect(() => {
     sendCommandRef.current = sendCommand;
   }, [sendCommand]);
 
-  const webrtcRef = useRef<WebRTCService | null>(null);
-  // Buffer ICE candidates that arrive before the peer connection is ready
-  const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+  // Map of active peer connections
+  const peersRef = useRef<Map<string, WebRTCService>>(new Map());
+  // Map of pending ICE candidates for each peer
+  const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
 
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  
+  // Track multiple remote streams for group call grid!
+  const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
 
-  // Ring plays for the CALLER (calling), not the callee (incoming)
+  // Ring when calling
   useEffect(() => {
     if (callState.status === "calling") {
       startRinging();
@@ -63,174 +77,210 @@ export function useWebRTC() {
     return () => stopRinging();
   }, [callState.status]);
 
-  // Initialize (or reuse) the WebRTC peer connection
-  const getWebRTC = useCallback(() => {
-    if (!webrtcRef.current) {
-      webrtcRef.current = new WebRTCService(
-        (stream) => {
-          setRemoteStream(stream);
-          dispatch(setCallStatus({ status: "connected" }));
-        },
-        (candidate) => {
-          sendCommandRef
-            .current(SocketCommands.SIGNAL_CALL, {
+  const removePeer = useCallback((peerId: string) => {
+    const pc = peersRef.current.get(peerId);
+    if (pc) {
+      pc.close();
+      peersRef.current.delete(peerId);
+    }
+    pendingCandidatesRef.current.delete(peerId);
+    setRemoteStreams((prev) => {
+      const next = new Map(prev);
+      next.delete(peerId);
+      return next;
+    });
+  }, []);
+
+  const createPeer = useCallback(
+    (peerId: string, currentLocalStream: MediaStream | null) => {
+      let webrtc = peersRef.current.get(peerId);
+      if (!webrtc) {
+        webrtc = new WebRTCService(
+          (stream) => {
+            setRemoteStreams((prev) => {
+              const next = new Map(prev);
+              next.set(peerId, stream);
+              return next;
+            });
+            dispatch(setCallStatus({ status: "connected" }));
+          },
+          (candidate) => {
+            sendCommandRef.current(SocketCommands.SIGNAL_CALL, {
               action: SignalCallAction.CANDIDATE,
               data: {
-                candidate: candidate.candidate,
+                candidate: encodeSignal(peerId, candidate.candidate),
                 sdpMid: candidate.sdpMid,
                 sdpMLineIndex: candidate.sdpMLineIndex,
               },
-            })
-            .catch((err) => {
-              toast.error(
-                "Connection issue encountered. The call might be unstable.",
-              );
-              console.error("Failed to send ICE candidate:", err);
-            });
-        },
-      );
-    }
-    return webrtcRef.current;
-  }, [dispatch]);
+            }).catch(console.error);
+          },
+        );
+        peersRef.current.set(peerId, webrtc);
+        if (currentLocalStream) {
+          webrtc.initialize(currentLocalStream);
+        }
+      }
+      return webrtc;
+    },
+    [dispatch],
+  );
 
-  // Drain any ICE candidates that arrived before the peer connection was ready
-  const drainPendingCandidates = useCallback(async () => {
-    const webrtc = webrtcRef.current;
-    if (!webrtc) return;
-    while (pendingCandidatesRef.current.length > 0) {
-      const candidate = pendingCandidatesRef.current.shift()!;
+  const drainPendingCandidates = useCallback(async (peerId: string, webrtc: WebRTCService) => {
+    const pending = pendingCandidatesRef.current.get(peerId) || [];
+    while (pending.length > 0) {
+      const candidate = pending.shift()!;
       await webrtc.addIceCandidate(candidate).catch(console.error);
     }
   }, []);
 
-  // Stable socket event handler — does NOT change on every render
   const handleSignalEvent = useCallback(
     async (payload: SignalCallRelayPayload) => {
       const { action, sender_uuid, data } = payload;
+      const myId = getPersistentUserId();
 
-      // CRITICAL: The backend broadcasts events back to the sender too.
-      // We must ignore our own events to avoid self-interference.
-      if (sender_uuid === getPersistentUserId()) return;
+      if (sender_uuid === myId) return;
 
       switch (action) {
-        case SignalCallAction.OFFER:
-          // Store the offer in Redux for acceptCall() to use later
-          dispatch(
-            setCallStatus({
-              status: "incoming",
-              peerId: sender_uuid,
-              isIncoming: true,
-              offer: data as unknown as RTCSessionDescriptionInit,
-            }),
-          );
+        case SignalCallAction.OFFER: {
+          const decoded = decodeSignal(data.sdp);
+          if (!decoded) return;
+          const { targetUuid, realPayload } = decoded;
+
+          if (realPayload === "CALL_RING" && targetUuid === "*") {
+            // New call started by someone
+            if (callState.status === "idle") {
+              dispatch(
+                setCallStatus({
+                  status: "incoming",
+                  peerId: sender_uuid,
+                  isIncoming: true,
+                }),
+              );
+            }
+            return;
+          }
+
+          if (realPayload === "JOIN_REQUEST" && targetUuid === "*") {
+            // Someone joined the call. If I am in the call, I must create an OFFER for them
+            if (callState.status === "connected" || callState.status === "calling") {
+              dispatch(setCallStatus({ status: "connected" })); // Clear my calling state since someone is here
+              const webrtc = createPeer(sender_uuid, localStream);
+              const offer = await webrtc.createOffer();
+              await sendCommandRef.current(SocketCommands.SIGNAL_CALL, {
+                action: SignalCallAction.OFFER,
+                data: {
+                  type: offer.type,
+                  sdp: encodeSignal(sender_uuid, offer.sdp!),
+                },
+              }).catch(console.error);
+            }
+            return;
+          }
+
+          // Must be a real MESH targeted offer
+          if (targetUuid !== myId) return; // Not for me
+          const webrtc = createPeer(sender_uuid, localStream);
+          await webrtc.setAnswer({ type: "offer", sdp: realPayload });
+          const answer = await webrtc.createAnswer({ type: "offer", sdp: realPayload });
+          await drainPendingCandidates(sender_uuid, webrtc);
+
+          await sendCommandRef.current(SocketCommands.SIGNAL_CALL, {
+            action: SignalCallAction.ANSWER,
+            data: {
+              type: answer.type,
+              sdp: encodeSignal(sender_uuid, answer.sdp!),
+            },
+          }).catch(console.error);
           break;
+        }
 
         case SignalCallAction.ANSWER: {
-          // Callee sent an answer — set it as the remote description on the caller
-          const webrtc = webrtcRef.current;
-          if (!webrtc) break;
-          if (data.sdp) {
-            await webrtc
-              .setAnswer({
-                type: "answer",
-                sdp: data.sdp as string,
-              })
-              .catch(console.error);
-            // Drain any buffered candidates now that remote description is set
-            await drainPendingCandidates();
+          const decoded = decodeSignal(data.sdp);
+          if (!decoded) return;
+          const { targetUuid, realPayload } = decoded;
+          if (targetUuid !== myId) return;
+
+          const webrtc = peersRef.current.get(sender_uuid);
+          if (webrtc) {
+            await webrtc.setAnswer({ type: "answer", sdp: realPayload }).catch(console.error);
+            await drainPendingCandidates(sender_uuid, webrtc);
           }
           break;
         }
 
         case SignalCallAction.CANDIDATE: {
-          const webrtc = webrtcRef.current;
+          const decoded = decodeSignal(data.candidate);
+          if (!decoded) return;
+          const { targetUuid, realPayload } = decoded;
+          if (targetUuid !== myId) return;
+
+          const candidateInit = { ...data, candidate: realPayload } as unknown as RTCIceCandidateInit;
+          const webrtc = peersRef.current.get(sender_uuid);
+
           if (webrtc && webrtc.isReadyForCandidates()) {
-            await webrtc
-              .addIceCandidate(data as unknown as RTCIceCandidateInit)
-              .catch(console.error);
+            await webrtc.addIceCandidate(candidateInit).catch(console.error);
           } else {
-            // Buffer it — peer connection isn't fully negotiated yet
-            pendingCandidatesRef.current.push(
-              data as unknown as RTCIceCandidateInit,
-            );
+            const pending = pendingCandidatesRef.current.get(sender_uuid) || [];
+            pending.push(candidateInit);
+            pendingCandidatesRef.current.set(sender_uuid, pending);
           }
           break;
         }
 
         case SignalCallAction.REJECT:
-        case SignalCallAction.HANGUP:
-          webrtcRef.current?.close();
-          webrtcRef.current = null;
-          pendingCandidatesRef.current = [];
-          dispatch(clearCall());
-          setLocalStream(null);
-          setRemoteStream(null);
+        case SignalCallAction.HANGUP: {
+          // The backend strips data for REJECT and HANGUP, but sender_uuid tells us who left.
+          removePeer(sender_uuid);
+          
+          // If nobody else is left, clear the call locally
+          if (peersRef.current.size === 0) {
+            dispatch(clearCall());
+            setLocalStream((prev) => {
+              if (prev) prev.getTracks().forEach((t) => t.stop());
+              return null;
+            });
+          }
           break;
+        }
       }
     },
-    [dispatch, drainPendingCandidates],
+    [callState.status, localStream, dispatch, createPeer, drainPendingCandidates, removePeer],
   );
 
   useSocketEvent("SignalCallRelay", handleSignalEvent);
 
   const startCall = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true,
-      });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       setLocalStream(stream);
-      const webrtc = getWebRTC();
-      await webrtc.initialize(stream);
-      const offer = await webrtc.createOffer();
 
       await sendCommandRef.current(SocketCommands.SIGNAL_CALL, {
         action: SignalCallAction.OFFER,
-        data: {
-          type: offer.type,
-          sdp: offer.sdp,
-        },
+        data: { type: "offer", sdp: encodeSignal("*", "CALL_RING") },
       });
 
       dispatch(setCallStatus({ status: "calling", isIncoming: false }));
     } catch (err) {
-      toast.error("Failed to start call. Please check your camera/microphone.");
-      console.error("Failed to start call:", err);
+      toast.error("Failed to start call. Check your camera/microphone.");
+      console.error(err);
     }
   };
 
-  const acceptCall = async (offer: RTCSessionDescriptionInit) => {
+  const acceptCall = async () => {
     try {
       stopRinging();
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true,
-      });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       setLocalStream(stream);
-      const webrtc = getWebRTC();
-      await webrtc.initialize(stream);
-
-      // createAnswer sets remote description internally, which makes the pc ready
-      const answer = await webrtc.createAnswer(offer);
-
-      // Now it's safe to drain any ICE candidates that arrived during negotiation
-      await drainPendingCandidates();
 
       await sendCommandRef.current(SocketCommands.SIGNAL_CALL, {
-        action: SignalCallAction.ANSWER,
-        data: {
-          type: answer.type,
-          sdp: answer.sdp,
-        },
+        action: SignalCallAction.OFFER, // Send JOIN_REQUEST using OFFER action
+        data: { type: "offer", sdp: encodeSignal("*", "JOIN_REQUEST") },
       });
 
-      // Update UI immediately so the "Answer" button disappears
       dispatch(setCallStatus({ status: "connected" }));
     } catch (err) {
-      toast.error(
-        "Failed to accept call. Please check your camera/microphone.",
-      );
-      console.error("Failed to accept call:", err);
+      toast.error("Failed to join call. Check your camera/microphone.");
+      console.error(err);
     }
   };
 
@@ -238,6 +288,7 @@ export function useWebRTC() {
     stopRinging();
     await sendCommandRef.current(SocketCommands.SIGNAL_CALL, {
       action: SignalCallAction.REJECT,
+      data: { type: "offer", sdp: encodeSignal("*", "REJECT") }
     });
     dispatch(clearCall());
   };
@@ -245,22 +296,23 @@ export function useWebRTC() {
   const hangUp = async () => {
     await sendCommandRef.current(SocketCommands.SIGNAL_CALL, {
       action: SignalCallAction.HANGUP,
+      data: { type: "offer", sdp: encodeSignal("*", "HANGUP") }
     });
-    webrtcRef.current?.close();
-    webrtcRef.current = null;
-    pendingCandidatesRef.current = [];
+    peersRef.current.forEach((_, peerId) => removePeer(peerId));
     dispatch(clearCall());
-    setLocalStream(null);
-    setRemoteStream(null);
+    setLocalStream((prev) => {
+      if (prev) prev.getTracks().forEach((t) => t.stop());
+      return null;
+    });
   };
 
   return {
     callState,
     startCall,
-    acceptCall,
+    acceptCall, // Removed the offer parameter, it's automatic now!
     rejectCall,
     hangUp,
     localStream,
-    remoteStream,
+    remoteStreams,
   };
 }

@@ -104,8 +104,8 @@ export class WebRTCService {
       this.pc.close();
       this.pc = null;
     }
+    // DO NOT invoke track.stop() here because localStream is shared across multiple peers in a mesh!
     if (this.localStream) {
-      this.localStream.getTracks().forEach((track) => track.stop());
       this.localStream = null;
     }
   }
