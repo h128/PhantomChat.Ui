@@ -190,7 +190,10 @@ export class WebSocketClient {
         const { event_name, ...payload } = data;
         this.emit(
           event_name as SocketEvent["event_name"],
-          payload as Extract<SocketEvent, { event_name: typeof event_name }>["payload"],
+          payload as Extract<
+            SocketEvent,
+            { event_name: typeof event_name }
+          >["payload"],
         );
         return;
       }

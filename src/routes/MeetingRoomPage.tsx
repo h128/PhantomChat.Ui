@@ -100,7 +100,13 @@ async function joinRoom(
   }
 }
 
-const RemoteVideo = ({ stream, label = "Remote" }: { stream: MediaStream, label?: string }) => {
+const RemoteVideo = ({
+  stream,
+  label = "Remote",
+}: {
+  stream: MediaStream;
+  label?: string;
+}) => {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     if (ref.current && stream) {
@@ -110,7 +116,12 @@ const RemoteVideo = ({ stream, label = "Remote" }: { stream: MediaStream, label?
 
   return (
     <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-800 shadow-inner">
-      <video ref={ref} autoPlay playsInline className="h-full w-full object-cover" />
+      <video
+        ref={ref}
+        autoPlay
+        playsInline
+        className="h-full w-full object-cover"
+      />
       <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">
         {label}
       </div>
@@ -328,9 +339,13 @@ export function MeetingRoomPage() {
             {callState.status === "connected" && (
               <div className="mb-8 grid w-full grid-cols-2 gap-4">
                 {Array.from(remoteStreams.entries()).map(([peerId, stream]) => (
-                  <RemoteVideo key={peerId} stream={stream} label={`Remote (${peerId.slice(0, 4)})`} />
+                  <RemoteVideo
+                    key={peerId}
+                    stream={stream}
+                    label={`Remote (${peerId.slice(0, 4)})`}
+                  />
                 ))}
-                
+
                 <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-800 shadow-inner">
                   <video
                     ref={localVideoRef}
