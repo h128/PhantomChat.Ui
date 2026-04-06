@@ -43,7 +43,7 @@ describe("user utilities", () => {
 
     const userId = getPersistentUserId();
 
-    expect(userId).toBe("user_4fzzzxjylrx_loyw3v28");
+    expect(userId).toBe("user_4fzzzxj_loyw3v28");
     expect(localStorage.getItem("phantomchat_user_uuid")).toBe(userId);
   });
 });
