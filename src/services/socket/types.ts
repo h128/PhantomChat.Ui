@@ -59,7 +59,7 @@ export type SignalingData = {
 export type SignalCallRelayPayload = {
   action: number;
   sender_uuid: string;
-  signaling_data: SignalingData;
+  data: SignalingData;
 };
 
 export type SocketEvent =

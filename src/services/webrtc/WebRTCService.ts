@@ -43,8 +43,12 @@ export class WebRTCService {
 
     // Handle remote tracks
     this.pc.ontrack = (event) => {
-      if (this.onTrackCallback && event.streams[0]) {
-        this.onTrackCallback(event.streams[0]);
+      if (this.onTrackCallback) {
+        const stream =
+          event.streams && event.streams[0]
+            ? event.streams[0]
+            : new MediaStream([event.track]);
+        this.onTrackCallback(stream);
       }
     };
 
@@ -81,6 +85,18 @@ export class WebRTCService {
   public async addIceCandidate(candidate: RTCIceCandidateInit) {
     if (!this.pc) throw new Error("PeerConnection not initialized");
     await this.pc.addIceCandidate(new RTCIceCandidate(candidate));
+  }
+
+  /**
+   * Returns true when the peer connection has a remote description set,
+   * meaning it is safe to apply incoming ICE candidates directly.
+   */
+  public isReadyForCandidates(): boolean {
+    return (
+      this.pc !== null &&
+      this.pc.remoteDescription !== null &&
+      this.pc.signalingState !== "closed"
+    );
   }
 
   public close() {
