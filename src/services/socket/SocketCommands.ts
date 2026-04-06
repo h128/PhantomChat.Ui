@@ -28,5 +28,7 @@ export const SignalCallAction = {
   HANGUP: 5,
 } as const;
 
-export type SocketCommand = (typeof SocketCommands)[keyof typeof SocketCommands];
-export type SignalCallActionType = (typeof SignalCallAction)[keyof typeof SignalCallAction];
+export type SocketCommand =
+  (typeof SocketCommands)[keyof typeof SocketCommands];
+export type SignalCallActionType =
+  (typeof SignalCallAction)[keyof typeof SignalCallAction];
