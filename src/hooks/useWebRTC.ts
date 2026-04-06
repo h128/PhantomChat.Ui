@@ -147,7 +147,6 @@ export function useWebRTC() {
           const { targetUuid, realPayload } = decoded;
 
           if (realPayload === "CALL_RING" && targetUuid === "*") {
-            // New call started by someone
             if (callState.status === "idle") {
               dispatch(
                 setCallStatus({
@@ -156,6 +155,18 @@ export function useWebRTC() {
                   isIncoming: true,
                 }),
               );
+            } else if (callState.status === "connected" || callState.status === "calling") {
+              // Already in the call. Treat their CALL_RING exactly like a JOIN_REQUEST to pull them in.
+              dispatch(setCallStatus({ status: "connected" }));
+              const webrtc = createPeer(sender_uuid, localStream);
+              const offer = await webrtc.createOffer();
+              await sendCommandRef.current(SocketCommands.SIGNAL_CALL, {
+                action: SignalCallAction.OFFER,
+                data: {
+                  type: offer.type,
+                  sdp: encodeSignal(sender_uuid, offer.sdp!),
+                },
+              }).catch(console.error);
             }
             return;
           }
