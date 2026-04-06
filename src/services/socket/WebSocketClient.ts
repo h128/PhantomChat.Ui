@@ -186,8 +186,12 @@ export class WebSocketClient {
 
       // Discriminator: Push Events (Explicit event_name)
       if (data.event_name) {
-        // The server sends data fields at the top level, not in a 'payload' property
-        this.emit(data.event_name, data);
+        // The public event contract exposes only the event payload, not the transport envelope.
+        const { event_name, ...payload } = data;
+        this.emit(
+          event_name as SocketEvent["event_name"],
+          payload as Extract<SocketEvent, { event_name: typeof event_name }>["payload"],
+        );
         return;
       }
 
