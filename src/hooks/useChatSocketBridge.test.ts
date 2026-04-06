@@ -10,6 +10,14 @@ const fixedMessageOptions = {
   getTimestamp: () => "2026-04-02T10:30:00.000Z",
 };
 
+const expectedMappedMessage = {
+  id: "message-1",
+  senderId: "user_alpha_123",
+  senderName: "Alpha",
+  content: "Hello team",
+  timestamp: "2026-04-02T10:30:00.000Z",
+};
+
 describe("useChatSocketBridge helpers", () => {
   it("formats display names from structured user ids", () => {
     expect(formatDisplayName("user_alpha_123")).toBe("User alpha");
@@ -32,13 +40,7 @@ describe("useChatSocketBridge helpers", () => {
       type: "chat/messageReceived",
       payload: {
         roomId: "launch-pad",
-        message: {
-          id: "message-1",
-          senderId: "user_alpha_123",
-          senderName: "Alpha",
-          content: "Hello team",
-          timestamp: "2026-04-02T10:30:00.000Z",
-        },
+        message: expectedMappedMessage,
       },
     });
   });
