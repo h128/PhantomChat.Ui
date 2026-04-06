@@ -1,4 +1,4 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useState } from "react";
 import { toast } from "sonner";
 import { useAppDispatch, useAppSelector } from "../app/hooks";
 import {
@@ -18,15 +18,15 @@ export function useWebRTC() {
   const callState = useAppSelector(selectCallState);
   const sendCommand = useSocketCommand();
   const webrtcRef = useRef<WebRTCService | null>(null);
-  const localStreamRef = useRef<MediaStream | null>(null);
-  const remoteStreamRef = useRef<MediaStream | null>(null);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
 
   // Initialize WebRTC Service
   const getWebRTC = useCallback(() => {
     if (!webrtcRef.current) {
       webrtcRef.current = new WebRTCService(
         (stream) => {
-          remoteStreamRef.current = stream;
+          setRemoteStream(stream);
           dispatch(setCallStatus({ status: "connected" }));
         },
         (candidate) => {
@@ -39,7 +39,9 @@ export function useWebRTC() {
               sdpMLineIndex: candidate.sdpMLineIndex,
             },
           }).catch((err) => {
-            toast.error("Connection issue encountered. The call might be unstable.");
+            toast.error(
+              "Connection issue encountered. The call might be unstable.",
+            );
             console.error("Failed to send ICE candidate:", err);
           });
         },
@@ -82,8 +84,8 @@ export function useWebRTC() {
       case SignalCallAction.HANGUP:
         webrtc.close();
         dispatch(clearCall());
-        localStreamRef.current = null;
-        remoteStreamRef.current = null;
+        setLocalStream(null);
+        setRemoteStream(null);
         break;
     }
   });
@@ -94,7 +96,7 @@ export function useWebRTC() {
         video: true,
         audio: true,
       });
-      localStreamRef.current = stream;
+      setLocalStream(stream);
       const webrtc = getWebRTC();
       await webrtc.initialize(stream);
       const offer = await webrtc.createOffer();
@@ -120,7 +122,7 @@ export function useWebRTC() {
         video: true,
         audio: true,
       });
-      localStreamRef.current = stream;
+      setLocalStream(stream);
       const webrtc = getWebRTC();
       await webrtc.initialize(stream);
       const answer = await webrtc.createAnswer(offer);
@@ -135,7 +137,9 @@ export function useWebRTC() {
 
       dispatch(setCallStatus({ status: "connected" }));
     } catch (err) {
-      toast.error("Failed to accept call. Please check your camera/microphone.");
+      toast.error(
+        "Failed to accept call. Please check your camera/microphone.",
+      );
       console.error("Failed to accept call:", err);
     }
   };
@@ -155,8 +159,8 @@ export function useWebRTC() {
       webrtcRef.current.close();
     }
     dispatch(clearCall());
-    localStreamRef.current = null;
-    remoteStreamRef.current = null;
+    setLocalStream(null);
+    setRemoteStream(null);
   };
 
   return {
@@ -165,7 +169,7 @@ export function useWebRTC() {
     acceptCall,
     rejectCall,
     hangUp,
-    localStream: localStreamRef.current,
-    remoteStream: remoteStreamRef.current,
+    localStream,
+    remoteStream,
   };
 }
