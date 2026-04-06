@@ -215,21 +215,37 @@ describe("WebSocketClient Core Infrastructure", () => {
     });
 
     it("should schedule a reconnect after an unclean close", () => {
-        const stateListener = vi.fn();
-        client.on("state_changed", stateListener);
-        const connectSpy = vi.spyOn(client, "connect");
-        const { internals } = attachOpenSocket(client);
+        const mockWebSocket = vi.fn(() => ({
+            send: vi.fn(),
+            close: vi.fn(),
+            readyState: 0,
+            onopen: null,
+            onmessage: null,
+            onclose: null,
+            onerror: null,
+        }));
+        vi.stubGlobal("WebSocket", mockWebSocket as unknown as typeof WebSocket);
 
-        internals.handleClose({ wasClean: false } as CloseEvent);
+        try {
+            const stateListener = vi.fn();
+            client.on("state_changed", stateListener);
+            const connectSpy = vi.spyOn(client, "connect");
+            const { internals } = attachOpenSocket(client);
 
-        expect(client.getState()).toBe("reconnecting");
-        expect(internals.reconnectAttempts).toBe(1);
-        expect(internals.reconnectTimer).not.toBeNull();
+            internals.handleClose({ wasClean: false } as CloseEvent);
 
-        vi.advanceTimersByTime(2000);
+            expect(client.getState()).toBe("reconnecting");
+            expect(internals.reconnectAttempts).toBe(1);
+            expect(internals.reconnectTimer).not.toBeNull();
 
-        expect(connectSpy).toHaveBeenCalled();
-        expect(stateListener).toHaveBeenCalledWith("reconnecting");
+            vi.advanceTimersByTime(2000);
+
+            expect(connectSpy).toHaveBeenCalled();
+            expect(mockWebSocket).toHaveBeenCalled();
+            expect(stateListener).toHaveBeenCalledWith("reconnecting");
+        } finally {
+            vi.unstubAllGlobals();
+        }
     });
 
     it("should become disconnected on a clean close without reconnecting", () => {
