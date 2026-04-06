@@ -38,9 +38,12 @@ describe("user utilities", () => {
   });
 
   it("creates and stores a new persistent user id when none exists", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.123456789);
+    vi.spyOn(Date, "now").mockReturnValue(1700000000000);
+
     const userId = getPersistentUserId();
 
-    expect(userId).toMatch(/^user_[a-z0-9]+_[a-z0-9]+$/);
+    expect(userId).toBe("user_4fzzzxjylrx_loyw3v28");
     expect(localStorage.getItem("phantomchat_user_uuid")).toBe(userId);
   });
 });
