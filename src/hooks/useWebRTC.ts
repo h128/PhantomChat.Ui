@@ -72,19 +72,21 @@ export function useWebRTC() {
           dispatch(setCallStatus({ status: "connected" }));
         },
         (candidate) => {
-          sendCommandRef.current(SocketCommands.SIGNAL_CALL, {
-            action: SignalCallAction.CANDIDATE,
-            data: {
-              candidate: candidate.candidate,
-              sdpMid: candidate.sdpMid,
-              sdpMLineIndex: candidate.sdpMLineIndex,
-            },
-          }).catch((err) => {
-            toast.error(
-              "Connection issue encountered. The call might be unstable.",
-            );
-            console.error("Failed to send ICE candidate:", err);
-          });
+          sendCommandRef
+            .current(SocketCommands.SIGNAL_CALL, {
+              action: SignalCallAction.CANDIDATE,
+              data: {
+                candidate: candidate.candidate,
+                sdpMid: candidate.sdpMid,
+                sdpMLineIndex: candidate.sdpMLineIndex,
+              },
+            })
+            .catch((err) => {
+              toast.error(
+                "Connection issue encountered. The call might be unstable.",
+              );
+              console.error("Failed to send ICE candidate:", err);
+            });
         },
       );
     }
