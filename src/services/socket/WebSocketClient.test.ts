@@ -38,7 +38,7 @@ function attachOpenSocket(client: WebSocketClient) {
 }
 
 describe("WebSocketClient Core Infrastructure", () => {
-    let client: WebSocketClient;
+  let client: WebSocketClient;
 
     beforeEach(() => {
         vi.useFakeTimers();

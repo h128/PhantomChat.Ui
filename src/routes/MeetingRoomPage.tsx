@@ -1,14 +1,26 @@
 import clsx from "clsx";
+import { PhoneOff, Video } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
+import { toast } from "sonner";
 import { useAppDispatch, useAppSelector } from "../app/hooks";
 import { ChatBox } from "../components/ChatBox";
 import { ThemeToggle } from "../components/ThemeToggle";
-import { setActiveRoom } from "../features/chat/chatSlice";
+import { setActiveRoom, setRoomInfo } from "../features/chat/chatSlice";
 import { selectResolvedTheme } from "../features/theme/themeSlice";
 import { useSocketCommand, useSocketState } from "../hooks/useSocket";
 import { SocketCommands } from "../services/socket/SocketCommands";
+import type { CommandResponse } from "../services/socket/types";
 import { getPersistentUserId } from "../utils/user";
+import { useWebRTC } from "../hooks/useWebRTC";
+
+function normalizeMeetingName(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
 function formatRoomName(value: string) {
   return value
@@ -18,62 +30,175 @@ function formatRoomName(value: string) {
     .join(" ");
 }
 
+type SendCommand = ReturnType<typeof useSocketCommand>;
+type Dispatch = ReturnType<typeof useAppDispatch>;
+
+async function joinRoom(
+  sendCommand: SendCommand,
+  dispatch: Dispatch,
+  normalizedRoomName: string,
+  displayRoomName: string,
+  hasJoinedRef: React.MutableRefObject<boolean>,
+  retryOnConflict = true,
+): Promise<void> {
+  try {
+    const response = (await sendCommand(SocketCommands.CREATE_ROOM, {
+      user_uuid: getPersistentUserId(),
+      room_name: normalizedRoomName,
+      public_key: "standard-v1-key",
+    })) as CommandResponse;
+
+    const status = response.status;
+    const roomKey = response.room_key as string | undefined;
+    const message = response.message ?? "";
+
+    if (status === 0) {
+      dispatch(setRoomInfo({ key: roomKey ?? "no-key", status: "joined" }));
+
+      await sendCommand(SocketCommands.JOIN_OR_MESSAGE, {
+        user_uuid: getPersistentUserId(),
+        room_name: normalizedRoomName,
+        message: "__JOIN__",
+      });
+
+      toast.success(`Joined ${displayRoomName}`);
+      console.log(
+        `[MeetingRoom] Successfully initialized and joined: ${normalizedRoomName}`,
+      );
+    } else if (
+      retryOnConflict &&
+      message.toLowerCase().includes("already in another room")
+    ) {
+      console.warn(
+        "[MeetingRoom] User already in another room. Forcing leave and retry...",
+      );
+
+      await sendCommand(SocketCommands.LEAVE_ROOM, {
+        room_name: normalizedRoomName,
+      }).catch(() => {});
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      return joinRoom(
+        sendCommand,
+        dispatch,
+        normalizedRoomName,
+        displayRoomName,
+        hasJoinedRef,
+        false,
+      );
+    } else {
+      dispatch(setRoomInfo({ key: "no-key", status: "error" }));
+      toast.error("Failed to join room. Please try again.");
+    }
+  } catch (err) {
+    console.error(
+      `[MeetingRoom] Failed to initialize ${normalizedRoomName}:`,
+      err,
+    );
+    dispatch(setRoomInfo({ key: "no-key", status: "error" }));
+    toast.error("Failed to initialize room. Please try again.");
+    hasJoinedRef.current = false;
+  }
+}
+
 export function MeetingRoomPage() {
   const { roomName = "" } = useParams();
   const dispatch = useAppDispatch();
   const resolvedTheme = useAppSelector(selectResolvedTheme);
   const sendCommand = useSocketCommand();
   const socketState = useSocketState(); // Track connection state
+  const chatState = useAppSelector((state) => state.chat);
+  const {
+    callState,
+    startCall,
+    acceptCall,
+    rejectCall,
+    hangUp,
+    localStream,
+    remoteStream,
+  } = useWebRTC();
+
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
   const isDark = resolvedTheme === "dark";
-  const displayRoomName = formatRoomName(roomName) || "Untitled Room";
+  const normalizedRoomName = normalizeMeetingName(roomName);
+  const displayRoomName = formatRoomName(normalizedRoomName) || "Untitled Room";
 
   const hasJoinedRef = useRef(false);
+  const sendCommandRef = useRef(sendCommand);
+  useEffect(() => {
+    sendCommandRef.current = sendCommand;
+  }, [sendCommand]);
 
   // 1. Immediate sync of activeRoomId and Join Room
   useEffect(() => {
-    if (!roomName || socketState !== "connected" || hasJoinedRef.current) return;
-    
-    dispatch(setActiveRoom(roomName));
-    hasJoinedRef.current = true; // Mark as joined to prevent duplicates in StrictMode
+    if (
+      !normalizedRoomName ||
+      socketState !== "connected" ||
+      hasJoinedRef.current ||
+      chatState.roomStatus === "joined" ||
+      chatState.roomStatus === "joining"
+    )
+      return;
 
-    // Send Join command (2) to subscribe to broadcasts
-    const joinRoom = async () => {
-      try {
-        await sendCommand(SocketCommands.JOIN_OR_MESSAGE, {
-          user_uuid: getPersistentUserId(),
-          room_name: roomName,
-          message: "__JOIN__", // Special token for internal filtering
-        });
-        console.log(`[MeetingRoom] Successfully subscribed to ${roomName}`);
-      } catch (err) {
-        console.error(`[MeetingRoom] Failed to subscribe to ${roomName}:`, err);
-        hasJoinedRef.current = false; // Reset on failure so it can retry
+    hasJoinedRef.current = true;
+    dispatch(setActiveRoom(normalizedRoomName));
+    dispatch(setRoomInfo({ key: "no-key", status: "joining" }));
+    joinRoom(
+      sendCommandRef.current,
+      dispatch,
+      normalizedRoomName,
+      displayRoomName,
+      hasJoinedRef,
+    );
+  }, [
+    normalizedRoomName,
+    displayRoomName,
+    dispatch,
+    socketState,
+    chatState.roomStatus,
+    chatState.activeRoomId,
+  ]);
+
+  // Handle Video Streams
+  useEffect(() => {
+    if (callState.status === "connected" || callState.status === "calling") {
+      if (localVideoRef.current && localStream) {
+        localVideoRef.current.srcObject = localStream;
       }
-    };
-
-    joinRoom();
-  }, [roomName, dispatch, sendCommand, socketState]); // Re-run when socket connects
+    }
+    if (callState.status === "connected") {
+      if (remoteVideoRef.current && remoteStream) {
+        remoteVideoRef.current.srcObject = remoteStream;
+      }
+    }
+  }, [callState.status, localStream, remoteStream]);
 
   // 2. Lifecycle adapter: Leave ONLY on actual unmount
   const leaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  
+
   useEffect(() => {
-    // If we remount (StrictMode), clear any pending leave
     if (leaveTimeoutRef.current) {
       clearTimeout(leaveTimeoutRef.current);
       leaveTimeoutRef.current = null;
     }
 
     return () => {
-      // Debounce the leave to avoid firing on StrictMode remounts
       leaveTimeoutRef.current = setTimeout(() => {
-        sendCommand(SocketCommands.LEAVE_ROOM, { room_name: roomName }).catch(
-          () => {},
-        );
-      }, 100); 
+        // Clear the global room status ONLY if we are still targeting this room
+        // and haven't already moved to a "joining" state for a new room.
+        if (chatState.activeRoomId === normalizedRoomName) {
+          dispatch(setRoomInfo({ key: "no-key", status: "idle" }));
+        }
+
+        sendCommandRef
+          .current(SocketCommands.LEAVE_ROOM, {
+            room_name: normalizedRoomName,
+          })
+          .catch(() => {});
+      }, 100);
     };
-  }, [roomName, sendCommand]);
+  }, [normalizedRoomName, chatState.activeRoomId, dispatch]);
 
   return (
     <div
@@ -131,7 +256,25 @@ export function MeetingRoomPage() {
               </p>
             </div>
           </div>
-          <ThemeToggle />
+
+          <div className="flex items-center gap-2">
+            {chatState.roomStatus === "joined" &&
+              callState.status === "idle" && (
+                <button
+                  onClick={startCall}
+                  className={clsx(
+                    "flex h-10 w-10 items-center justify-center rounded-full transition-all hover:scale-110 active:scale-95",
+                    isDark
+                      ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                      : "bg-emerald-100 text-emerald-600 hover:bg-emerald-200",
+                  )}
+                  title="Start Video Call"
+                >
+                  <Video size={20} />
+                </button>
+              )}
+            <ThemeToggle />
+          </div>
         </header>
 
         <main className="mt-5 flex min-h-0 flex-1 flex-col">
@@ -142,6 +285,112 @@ export function MeetingRoomPage() {
           </ChatBox>
         </main>
       </div>
+
+      {/* Call Overlay */}
+      {callState.status !== "idle" && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
+          <div
+            className={clsx(
+              "relative flex w-full max-w-2xl flex-col items-center rounded-3xl border p-8 shadow-2xl",
+              isDark
+                ? "border-white/10 bg-slate-900"
+                : "border-slate-200 bg-white",
+            )}
+          >
+            <div className="mb-6 flex flex-col items-center gap-4">
+              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-sky-500/20 text-sky-500">
+                <Video size={40} />
+              </div>
+              <div className="text-center">
+                <h2 className="text-xl font-bold">
+                  {callState.status === "incoming"
+                    ? "Incoming Call"
+                    : callState.status === "calling"
+                      ? "Calling..."
+                      : "Call Connected"}
+                </h2>
+                <p className={isDark ? "text-slate-400" : "text-slate-500"}>
+                  {callState.peerId || "Remote Peer"}
+                </p>
+              </div>
+            </div>
+
+            {callState.status === "connected" && (
+              <div className="mb-8 grid w-full grid-cols-2 gap-4">
+                <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-800 shadow-inner">
+                  <video
+                    ref={remoteVideoRef}
+                    autoPlay
+                    playsInline
+                    className="h-full w-full object-cover"
+                  />
+                  <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">
+                    Remote
+                  </div>
+                </div>
+                <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-800 shadow-inner">
+                  <video
+                    ref={localVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="h-full w-full object-cover"
+                  />
+                  <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">
+                    Local (You)
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {callState.status === "calling" && (
+              <div className="mb-8 flex w-full justify-center">
+                <div className="relative aspect-video w-64 overflow-hidden rounded-xl bg-slate-800 shadow-inner">
+                  <video
+                    ref={localVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="h-full w-full object-cover"
+                  />
+                  <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">
+                    Preview
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-4">
+              {callState.status === "incoming" ? (
+                <>
+                  <button
+                    onClick={() =>
+                      callState.offer && acceptCall(callState.offer)
+                    }
+                    className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 transition-transform hover:scale-110 active:scale-95"
+                  >
+                    <Video size={24} />
+                  </button>
+                  <button
+                    onClick={rejectCall}
+                    className="flex h-14 w-14 items-center justify-center rounded-full bg-rose-500 text-white shadow-lg shadow-rose-500/30 transition-transform hover:scale-110 active:scale-95"
+                  >
+                    <PhoneOff size={24} />
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={hangUp}
+                  className="flex h-14 w-40 items-center justify-center gap-3 rounded-full bg-rose-500 font-semibold text-white shadow-lg shadow-rose-500/30 transition-transform hover:scale-105 active:scale-95"
+                >
+                  <PhoneOff size={20} />
+                  <span>End Call</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

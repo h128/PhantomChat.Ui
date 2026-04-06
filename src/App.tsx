@@ -1,4 +1,5 @@
 import { RouterProvider, createBrowserRouter } from "react-router-dom";
+import { Toaster } from "sonner";
 import { HomePage } from "./routes/HomePage";
 import { MeetingRoomPage } from "./routes/MeetingRoomPage";
 import { NotFoundPage } from "./routes/NotFoundPage";
@@ -30,6 +31,7 @@ export default function App() {
     <SocketProvider>
       <SocketBridgeLoader />
       <RouterProvider router={router} />
+      <Toaster />
     </SocketProvider>
   );
 }
