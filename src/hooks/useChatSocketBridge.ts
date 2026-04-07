@@ -154,6 +154,7 @@ export function useChatSocketBridge() {
 
     const fileName = payload.file_name;
     const isImage = /\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(fileName);
+    const isAudio = /\.(webm|ogg|mp3|m4a|wav)$/i.test(fileName);
 
     if (isImage) {
       // Only react to the poster (original) event to avoid duplicate messages
@@ -171,6 +172,25 @@ export function useChatSocketBridge() {
           originalName: fileName,
           type: "image",
           thumbnailFile,
+        },
+      };
+      dispatch(
+        fileMessageReceived({
+          roomId: activeRoomId || "general",
+          message,
+        }),
+      );
+    } else if (isAudio) {
+      const message: ChatMessage = {
+        id: generateUUID(),
+        senderId: payload.user_uuid,
+        senderName: formatDisplayName(payload.user_uuid),
+        content: "",
+        timestamp: new Date().toISOString(),
+        attachment: {
+          fileName,
+          originalName: fileName,
+          type: "audio",
         },
       };
       dispatch(

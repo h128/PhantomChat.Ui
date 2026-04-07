@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { Download, FileIcon, X } from "lucide-react";
+import { Download, FileIcon, Pause, Play, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAppSelector } from "../../app/hooks";
@@ -137,6 +137,180 @@ function ImageAttachment({
         </div>
       )}
     </>
+  );
+}
+
+function VoiceMessagePlayer({
+  attachment,
+  roomName,
+  roomKey,
+  isDark,
+}: {
+  attachment: FileAttachment;
+  roomName: string;
+  roomKey: string;
+  isDark: boolean;
+}) {
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const pendingPlayRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
+    };
+  }, [audioUrl]);
+
+  // When audioUrl is set and a play was pending, play immediately
+  useEffect(() => {
+    if (audioUrl && pendingPlayRef.current) {
+      pendingPlayRef.current = false;
+      audioRef.current?.play().catch(() => {});
+    }
+  }, [audioUrl]);
+
+  const togglePlay = async () => {
+    const audio = audioRef.current;
+
+    if (isPlaying && audio) {
+      audio.pause();
+      return;
+    }
+
+    if (audioUrl && audio) {
+      audio.play().catch(() => {});
+      return;
+    }
+
+    // Need to download first — mark pending so the useEffect above plays it
+    if (isLoading) return;
+    pendingPlayRef.current = true;
+    setIsLoading(true);
+    try {
+      const { decryptFile, isEncryptionEnabled } =
+        await import("../../services/crypto");
+      const { downloadFile } = await import("../../services/fileUpload");
+      const data = await downloadFile(roomName, attachment.fileName);
+      const decrypted = isEncryptionEnabled()
+        ? await decryptFile(data, roomKey)
+        : data;
+      const url = URL.createObjectURL(new Blob([new Uint8Array(decrypted)]));
+      setAudioUrl(url);
+    } catch (err) {
+      console.error("Failed to load voice message:", err);
+      toast.error("Failed to load voice message.");
+      pendingPlayRef.current = false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const formatTime = (secs: number) => {
+    if (!isFinite(secs) || isNaN(secs)) return "0:00";
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m}:${String(s).padStart(2, "0")}`;
+  };
+
+  const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLAudioElement>) => {
+    const audio = e.currentTarget;
+    if (!isFinite(audio.duration)) {
+      // WebM blobs from MediaRecorder lack duration in the header;
+      // seeking to a large value forces the browser to scan the file and update duration.
+      audio.currentTime = 1e9;
+    } else {
+      setDuration(audio.duration);
+    }
+  };
+
+  const handleTimeUpdate = (e: React.SyntheticEvent<HTMLAudioElement>) => {
+    const audio = e.currentTarget;
+    setCurrentTime(audio.currentTime);
+    // After the seek trick, duration becomes finite — capture it and reset position
+    if (!isFinite(duration) || duration === 0) {
+      if (isFinite(audio.duration) && audio.duration > 0) {
+        setDuration(audio.duration);
+        audio.currentTime = 0;
+      }
+    }
+  };
+
+  const displayDuration =
+    duration > 0 && isFinite(duration) ? formatTime(duration) : "…";
+
+  return (
+    <div
+      className={clsx(
+        "mt-1.5 flex items-center gap-2.5 rounded-xl border px-3 py-2",
+        isDark ? "border-white/8 bg-white/5" : "border-slate-200 bg-slate-50",
+      )}
+    >
+      {audioUrl && (
+        <audio
+          ref={audioRef}
+          src={audioUrl}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          onEnded={() => {
+            setIsPlaying(false);
+            setCurrentTime(0);
+          }}
+          onTimeUpdate={handleTimeUpdate}
+          onLoadedMetadata={handleLoadedMetadata}
+        />
+      )}
+      <button
+        type="button"
+        onClick={togglePlay}
+        disabled={isLoading}
+        className={clsx(
+          "flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition",
+          isDark
+            ? "bg-sky-400/20 text-sky-300 hover:bg-sky-400/30"
+            : "bg-[#3390ec]/15 text-[#3390ec] hover:bg-[#3390ec]/25",
+          isLoading && "cursor-wait opacity-60",
+        )}
+      >
+        {isLoading ? (
+          <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+        ) : isPlaying ? (
+          <Pause size={14} />
+        ) : (
+          <Play size={14} />
+        )}
+      </button>
+
+      <div className="flex flex-1 flex-col gap-1 min-w-0">
+        <div
+          className={clsx(
+            "h-1 w-full rounded-full overflow-hidden",
+            isDark ? "bg-white/10" : "bg-slate-200",
+          )}
+        >
+          <div
+            className={clsx(
+              "h-full rounded-full transition-all",
+              isDark ? "bg-sky-400" : "bg-[#3390ec]",
+            )}
+            style={{
+              width: duration > 0 ? `${(currentTime / duration) * 100}%` : "0%",
+            }}
+          />
+        </div>
+        <span
+          className={clsx(
+            "text-xs tabular-nums",
+            isDark ? "text-slate-500" : "text-slate-400",
+          )}
+        >
+          {formatTime(currentTime)} / {displayDuration}
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -322,6 +496,13 @@ export function ChatBoxBody() {
                   roomKey &&
                   (msg.attachment.type === "image" ? (
                     <ImageAttachment
+                      attachment={msg.attachment}
+                      roomName={activeRoomId}
+                      roomKey={roomKey}
+                      isDark={isDark}
+                    />
+                  ) : msg.attachment.type === "audio" ? (
+                    <VoiceMessagePlayer
                       attachment={msg.attachment}
                       roomName={activeRoomId}
                       roomKey={roomKey}

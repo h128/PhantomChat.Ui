@@ -1,6 +1,6 @@
 import clsx from "clsx";
 import EmojiPicker, { Theme, type EmojiClickData } from "emoji-picker-react";
-import { LogOut, Paperclip, Send, Smile } from "lucide-react";
+import { LogOut, Mic, Paperclip, Send, Smile, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -14,6 +14,7 @@ import {
 } from "../../features/chat/chatSlice";
 import type { FileAttachment } from "../../features/chat/chatSlice";
 import { useSocketCommand } from "../../hooks/useSocket";
+import { useVoiceRecorder } from "../../hooks/useVoiceRecorder";
 import { encryptFile, isEncryptionEnabled } from "../../services/crypto";
 import type { CommandResponse } from "../../services/socket/types";
 import { generateUUID } from "../../utils/uuid";
@@ -27,6 +28,14 @@ import {
 import { SocketCommands } from "../../services/socket/SocketCommands";
 import { getPersistentUserId, getPersistentUserName } from "../../utils/user";
 import { useChatBox } from "./ChatBoxContext";
+
+function formatDuration(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const centiseconds = Math.floor((ms % 1000) / 10);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")},${String(centiseconds).padStart(2, "0")}`;
+}
 
 async function processFileUpload(
   file: File,
@@ -92,6 +101,36 @@ export function ChatBoxFooter() {
   const sendCommand = useSocketCommand();
 
   const isJoined = roomStatus === "joined";
+
+  const handleVoiceUploaded = (fileName: string) => {
+    const userId = getPersistentUserId();
+    dispatch(
+      fileMessageReceived({
+        roomId: activeRoomId,
+        message: {
+          id: generateUUID(),
+          senderId: userId,
+          senderName: getPersistentUserName(),
+          content: "",
+          timestamp: new Date().toISOString(),
+          attachment: {
+            fileName,
+            originalName: fileName,
+            type: "audio",
+          },
+        },
+      }),
+    );
+  };
+
+  const voice = useVoiceRecorder({
+    roomId: activeRoomId,
+    roomKey,
+    onUploaded: handleVoiceUploaded,
+  });
+
+  const isRecording = voice.state === "recording";
+  const isVoiceUploading = voice.state === "uploading";
 
   const handleSend = async () => {
     const trimmed = value.trim();
@@ -197,7 +236,7 @@ export function ChatBoxFooter() {
         isDark ? "border-white/8" : "border-slate-200/80",
       )}
     >
-      {showEmojiPicker && (
+      {showEmojiPicker && !isRecording && (
         <div ref={pickerRef} className="absolute bottom-full left-0 z-10 mb-2">
           <EmojiPicker
             theme={isDark ? Theme.DARK : Theme.LIGHT}
@@ -225,76 +264,158 @@ export function ChatBoxFooter() {
               : "border-slate-200 bg-slate-50",
           )}
         >
-          <button
-            ref={toggleRef}
-            type="button"
-            onClick={() => setShowEmojiPicker((prev) => !prev)}
-            className={clsx(
-              "flex h-8 w-8 items-center justify-center rounded-xl transition",
-              showEmojiPicker
-                ? isDark
-                  ? "text-sky-400"
-                  : "text-[#3390ec]"
-                : isDark
-                  ? "text-slate-500 hover:text-slate-300"
-                  : "text-slate-400 hover:text-slate-600",
-            )}
-          >
-            <Smile size={18} />
-          </button>
-          <input
-            type="text"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={!isJoined}
-            placeholder={
-              roomStatus === "joining"
-                ? "Joining Room..."
-                : roomStatus === "error"
-                  ? "Connection Error"
-                  : "Message"
-            }
-            className={clsx(
-              "flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400",
-              !isJoined && "cursor-not-allowed opacity-50",
-              isDark ? "text-slate-100" : "text-slate-900",
-            )}
-          />
-          {value.trim() ? (
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={!isJoined}
-              className={clsx(
-                "flex h-8 w-8 items-center justify-center rounded-xl transition",
-                !isJoined && "cursor-not-allowed opacity-50",
-                isDark
-                  ? "bg-sky-400 text-slate-950 hover:bg-sky-300"
-                  : "bg-[#3390ec] text-white hover:bg-[#2b82d9]",
-              )}
-            >
-              <Send size={16} />
-            </button>
+          {isRecording || isVoiceUploading ? (
+            /* ── Recording bar ── */
+            <>
+              <button
+                type="button"
+                onClick={voice.cancel}
+                disabled={isVoiceUploading}
+                className={clsx(
+                  "flex h-8 w-8 items-center justify-center rounded-xl transition",
+                  isVoiceUploading
+                    ? "cursor-not-allowed opacity-40"
+                    : isDark
+                      ? "text-rose-400 hover:text-rose-300"
+                      : "text-rose-500 hover:text-rose-600",
+                )}
+              >
+                <Trash2 size={18} />
+              </button>
+
+              <div className="flex flex-1 items-center gap-2">
+                {isVoiceUploading ? (
+                  <span
+                    className={clsx(
+                      "text-sm",
+                      isDark ? "text-slate-400" : "text-slate-500",
+                    )}
+                  >
+                    Sending…
+                  </span>
+                ) : (
+                  <>
+                    <span className="animate-pulse text-rose-500">●</span>
+                    <span
+                      className={clsx(
+                        "tabular-nums text-sm",
+                        isDark ? "text-slate-200" : "text-slate-700",
+                      )}
+                    >
+                      {formatDuration(voice.elapsedMs)}
+                    </span>
+                  </>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={voice.stopAndSend}
+                disabled={isVoiceUploading}
+                className={clsx(
+                  "flex h-8 w-8 items-center justify-center rounded-xl transition",
+                  isVoiceUploading && "cursor-not-allowed opacity-40",
+                  isDark
+                    ? "bg-sky-400 text-slate-950 hover:bg-sky-300"
+                    : "bg-[#3390ec] text-white hover:bg-[#2b82d9]",
+                )}
+              >
+                <Send size={16} />
+              </button>
+            </>
           ) : (
-            <button
-              type="button"
-              disabled={isUploading || !isJoined}
-              onClick={() => fileInputRef.current?.click()}
-              className={clsx(
-                "flex h-8 w-8 items-center justify-center rounded-xl transition",
-                (isUploading || !isJoined) && "cursor-not-allowed opacity-50",
-                isUploading
-                  ? isDark
-                    ? "text-slate-600"
-                    : "text-slate-300"
-                  : isDark
-                    ? "text-slate-500 hover:text-slate-300"
-                    : "text-slate-400 hover:text-slate-600",
+            /* ── Normal input bar ── */
+            <>
+              <button
+                ref={toggleRef}
+                type="button"
+                onClick={() => setShowEmojiPicker((prev) => !prev)}
+                className={clsx(
+                  "flex h-8 w-8 items-center justify-center rounded-xl transition",
+                  showEmojiPicker
+                    ? isDark
+                      ? "text-sky-400"
+                      : "text-[#3390ec]"
+                    : isDark
+                      ? "text-slate-500 hover:text-slate-300"
+                      : "text-slate-400 hover:text-slate-600",
+                )}
+              >
+                <Smile size={18} />
+              </button>
+              <input
+                type="text"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                disabled={!isJoined}
+                placeholder={
+                  roomStatus === "joining"
+                    ? "Joining Room..."
+                    : roomStatus === "error"
+                      ? "Connection Error"
+                      : "Message"
+                }
+                className={clsx(
+                  "flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400",
+                  !isJoined && "cursor-not-allowed opacity-50",
+                  isDark ? "text-slate-100" : "text-slate-900",
+                )}
+              />
+              {value.trim() ? (
+                <button
+                  type="button"
+                  onClick={handleSend}
+                  disabled={!isJoined}
+                  className={clsx(
+                    "flex h-8 w-8 items-center justify-center rounded-xl transition",
+                    !isJoined && "cursor-not-allowed opacity-50",
+                    isDark
+                      ? "bg-sky-400 text-slate-950 hover:bg-sky-300"
+                      : "bg-[#3390ec] text-white hover:bg-[#2b82d9]",
+                  )}
+                >
+                  <Send size={16} />
+                </button>
+              ) : (
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={isUploading || !isJoined}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={clsx(
+                      "flex h-8 w-8 items-center justify-center rounded-xl transition",
+                      (isUploading || !isJoined) &&
+                        "cursor-not-allowed opacity-50",
+                      isUploading
+                        ? isDark
+                          ? "text-slate-600"
+                          : "text-slate-300"
+                        : isDark
+                          ? "text-slate-500 hover:text-slate-300"
+                          : "text-slate-400 hover:text-slate-600",
+                    )}
+                  >
+                    <Paperclip size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!isJoined}
+                    onClick={voice.startRecording}
+                    title="Record voice message"
+                    className={clsx(
+                      "flex h-8 w-8 items-center justify-center rounded-xl transition",
+                      !isJoined && "cursor-not-allowed opacity-50",
+                      isDark
+                        ? "text-slate-500 hover:text-slate-300"
+                        : "text-slate-400 hover:text-slate-600",
+                    )}
+                  >
+                    <Mic size={18} />
+                  </button>
+                </div>
               )}
-            >
-              <Paperclip size={18} />
-            </button>
+            </>
           )}
         </div>
         <button
