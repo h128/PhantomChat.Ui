@@ -13,17 +13,6 @@ function ensureReady(): Promise<void> {
   return ready;
 }
 
-/**
- * Derives a fixed-length key from the room key string using generic hashing.
- */
-function deriveKey(roomKey: string): Uint8Array {
-  return sodium.crypto_generichash(
-    sodium.crypto_secretbox_KEYBYTES,
-    sodium.from_string(roomKey),
-    null,
-  );
-}
-
 interface SodiumKeyPair {
   keyType?: "curve25519" | "ed25519" | "x25519" | string;
   publicKey: Uint8Array;
@@ -32,6 +21,10 @@ interface SodiumKeyPair {
 
 let boxKeyPair: SodiumKeyPair | null = null;
 
+/**
+ * Returns the client's public key as a 64-char hex string (32 bytes).
+ * Generates a crypto_box keypair on first call; reuses it afterwards.
+ */
 export async function getPublicKeyHex(): Promise<string> {
   await ensureReady();
   if (!boxKeyPair) {
@@ -40,19 +33,22 @@ export async function getPublicKeyHex(): Promise<string> {
   return sodium.to_hex(boxKeyPair.publicKey);
 }
 
+/**
+ * Decrypts an encrypted room key from the server.
+ * The server encrypts with crypto_box_easy(room_key, zero_nonce, client_pk, server_sk).
+ */
 export async function decryptRoomKey(
   encryptedHex: string,
   serverPublicKeyHex?: string,
 ): Promise<string> {
   await ensureReady();
   if (!boxKeyPair) {
-    throw new Error("KeyPair not initialized");
+    throw new Error("KeyPair not initialized – call getPublicKeyHex() first");
   }
 
   const ciphertext = sodium.from_hex(encryptedHex);
   const nonce = new Uint8Array(sodium.crypto_box_NONCEBYTES); // Zeroed nonce as requested by backend
 
-  // Try decrypting. If the backend didn't provide its public key, we use a fallback or try our own.
   const serverPubKey = serverPublicKeyHex
     ? sodium.from_hex(serverPublicKeyHex)
     : boxKeyPair.publicKey;
@@ -64,6 +60,17 @@ export async function decryptRoomKey(
   );
 
   return sodium.to_string(decrypted);
+}
+
+/**
+ * Derives a fixed-length key from the room key string using generic hashing.
+ */
+function deriveKey(roomKey: string): Uint8Array {
+  return sodium.crypto_generichash(
+    sodium.crypto_secretbox_KEYBYTES,
+    sodium.from_string(roomKey),
+    null,
+  );
 }
 
 /**

@@ -1,13 +1,15 @@
 import clsx from "clsx";
 import {
+  ChevronDown,
   Mic,
   MicOff,
+  Phone,
+  PhoneCall,
   PhoneOff,
   Settings,
+  User,
   Video,
   VideoOff,
-  User,
-  ChevronDown,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
@@ -18,11 +20,11 @@ import { ThemeToggle } from "../components/ThemeToggle";
 import { setActiveRoom, setRoomInfo } from "../features/chat/chatSlice";
 import { selectResolvedTheme } from "../features/theme/themeSlice";
 import { useSocketCommand, useSocketState } from "../hooks/useSocket";
+import { useWebRTC } from "../hooks/useWebRTC";
+import { decryptRoomKey, getPublicKeyHex } from "../services/crypto";
 import { SocketCommands } from "../services/socket/SocketCommands";
 import type { CommandResponse } from "../services/socket/types";
 import { getPersistentUserId } from "../utils/user";
-import { useWebRTC } from "../hooks/useWebRTC";
-import { getPublicKeyHex, decryptRoomKey } from "../services/crypto";
 
 function normalizeMeetingName(value: string) {
   return value
@@ -52,16 +54,17 @@ async function joinRoom(
   retryOnConflict = true,
 ): Promise<void> {
   try {
-    const myPublicKey = await getPublicKeyHex();
+    const publicKey = await getPublicKeyHex();
+
     const response = (await sendCommand(SocketCommands.CREATE_ROOM, {
       user_uuid: getPersistentUserId(),
       room_name: normalizedRoomName,
-      public_key: myPublicKey,
+      public_key: publicKey,
     })) as CommandResponse;
 
     const status = response.status;
     const message = response.message ?? "";
-    const serverPubKey = response.public_key as string | undefined;
+    const serverPubKey = response.server_pub_key as string | undefined;
 
     let roomKey = "no-key";
     if (response.room_key) {
@@ -369,7 +372,7 @@ export function MeetingRoomPage() {
                     )}
                     title="Start Voice Call"
                   >
-                    <Mic size={20} />
+                    <Phone size={20} />
                   </button>
                   <button
                     onClick={() => startCall("video")}
@@ -414,7 +417,7 @@ export function MeetingRoomPage() {
                 {callState.callType === "video" ? (
                   <Video size={40} />
                 ) : (
-                  <Mic size={40} />
+                  <PhoneCall size={40} />
                 )}
               </div>
               <div className="text-center">
@@ -583,7 +586,7 @@ export function MeetingRoomPage() {
 
       {/* Media Settings Dialog */}
       {isSettingsOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm">
           <div
             className={clsx(
               "w-full max-w-md rounded-3xl p-8 shadow-2xl transition-all",
