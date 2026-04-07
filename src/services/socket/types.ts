@@ -25,6 +25,7 @@ export type RoomResponse = CommandResponse & {
   room_key: string;
   room_created: boolean;
   members: string[];
+  server_pub_key?: string;
 };
 
 export type NewMessagePayload = {

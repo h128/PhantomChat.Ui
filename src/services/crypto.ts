@@ -13,6 +13,46 @@ function ensureReady(): Promise<void> {
   return ready;
 }
 
+let clientKeyPair: { publicKey: Uint8Array; privateKey: Uint8Array } | null =
+  null;
+
+/**
+ * Returns the client's public key as a 64-char hex string (32 bytes).
+ * Generates a crypto_box keypair on first call; reuses it afterwards.
+ */
+export async function getPublicKeyHex(): Promise<string> {
+  await ensureReady();
+  if (!clientKeyPair) {
+    const kp = sodium.crypto_box_keypair();
+    clientKeyPair = { publicKey: kp.publicKey, privateKey: kp.privateKey };
+  }
+  return sodium.to_hex(clientKeyPair.publicKey);
+}
+
+/**
+ * Decrypts an encrypted room key from the server.
+ * The server encrypts with crypto_box_easy(room_key, zero_nonce, client_pk, server_sk).
+ */
+export async function decryptRoomKey(
+  encryptedHex: string,
+  serverPublicKeyHex: string,
+): Promise<string> {
+  await ensureReady();
+  if (!clientKeyPair) {
+    throw new Error("Key pair not initialized – call getPublicKeyHex() first");
+  }
+  const ciphertext = sodium.from_hex(encryptedHex);
+  const serverPk = sodium.from_hex(serverPublicKeyHex);
+  const nonce = new Uint8Array(sodium.crypto_box_NONCEBYTES); // zero nonce
+  const decrypted = sodium.crypto_box_open_easy(
+    ciphertext,
+    nonce,
+    serverPk,
+    clientKeyPair.privateKey,
+  );
+  return sodium.to_string(decrypted);
+}
+
 /**
  * Derives a fixed-length key from the room key string using generic hashing.
  */
