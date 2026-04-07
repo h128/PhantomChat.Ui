@@ -59,10 +59,18 @@ export function HomePage() {
         public_key: publicKey,
       })) as RoomResponse;
 
-      const roomKey =
-        response.room_key && response.server_pub_key
-          ? await decryptRoomKey(response.room_key, response.server_pub_key)
-          : response.room_key || "no-key";
+      let roomKey = "no-key";
+      if (response.room_key) {
+        try {
+          roomKey = await decryptRoomKey(
+            response.room_key,
+            response.server_pub_key,
+          );
+        } catch (err) {
+          console.warn("[HomePage] Failed to decrypt room key:", err);
+          roomKey = response.room_key;
+        }
+      }
 
       dispatch(
         setRoomInfo({

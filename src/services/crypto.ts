@@ -13,8 +13,13 @@ function ensureReady(): Promise<void> {
   return ready;
 }
 
-let clientKeyPair: { publicKey: Uint8Array; privateKey: Uint8Array } | null =
-  null;
+interface SodiumKeyPair {
+  keyType?: "curve25519" | "ed25519" | "x25519" | string;
+  publicKey: Uint8Array;
+  privateKey: Uint8Array;
+}
+
+let boxKeyPair: SodiumKeyPair | null = null;
 
 /**
  * Returns the client's public key as a 64-char hex string (32 bytes).
@@ -22,11 +27,10 @@ let clientKeyPair: { publicKey: Uint8Array; privateKey: Uint8Array } | null =
  */
 export async function getPublicKeyHex(): Promise<string> {
   await ensureReady();
-  if (!clientKeyPair) {
-    const kp = sodium.crypto_box_keypair();
-    clientKeyPair = { publicKey: kp.publicKey, privateKey: kp.privateKey };
+  if (!boxKeyPair) {
+    boxKeyPair = sodium.crypto_box_keypair();
   }
-  return sodium.to_hex(clientKeyPair.publicKey);
+  return sodium.to_hex(boxKeyPair.publicKey);
 }
 
 /**
@@ -35,21 +39,26 @@ export async function getPublicKeyHex(): Promise<string> {
  */
 export async function decryptRoomKey(
   encryptedHex: string,
-  serverPublicKeyHex: string,
+  serverPublicKeyHex?: string,
 ): Promise<string> {
   await ensureReady();
-  if (!clientKeyPair) {
-    throw new Error("Key pair not initialized – call getPublicKeyHex() first");
+  if (!boxKeyPair) {
+    throw new Error("KeyPair not initialized – call getPublicKeyHex() first");
   }
+
   const ciphertext = sodium.from_hex(encryptedHex);
-  const serverPk = sodium.from_hex(serverPublicKeyHex);
-  const nonce = new Uint8Array(sodium.crypto_box_NONCEBYTES); // zero nonce
+  const nonce = new Uint8Array(sodium.crypto_box_NONCEBYTES); // Zeroed nonce as requested by backend
+
+  const serverPubKey = serverPublicKeyHex
+    ? sodium.from_hex(serverPublicKeyHex)
+    : boxKeyPair.publicKey;
   const decrypted = sodium.crypto_box_open_easy(
     ciphertext,
     nonce,
-    serverPk,
-    clientKeyPair.privateKey,
+    serverPubKey,
+    boxKeyPair.privateKey,
   );
+
   return sodium.to_string(decrypted);
 }
 

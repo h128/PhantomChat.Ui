@@ -53,12 +53,12 @@ describe("chatSlice", () => {
 
     const nextState = chatReducer(initialState, markRoomRead("signal-lab"));
 
-    expect(nextState.rooms.find((room) => room.id === "signal-lab")?.unread).toBe(
-      0,
-    );
-    expect(nextState.rooms.find((room) => room.id === "launch-pad")?.unread).toBe(
-      7,
-    );
+    expect(
+      nextState.rooms.find((room) => room.id === "signal-lab")?.unread,
+    ).toBe(0);
+    expect(
+      nextState.rooms.find((room) => room.id === "launch-pad")?.unread,
+    ).toBe(7);
   });
 
   it("stores room join metadata", () => {

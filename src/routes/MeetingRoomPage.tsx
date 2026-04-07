@@ -1,6 +1,15 @@
 import clsx from "clsx";
-import { PhoneOff, Video } from "lucide-react";
-import { useEffect, useRef } from "react";
+import {
+  Mic,
+  MicOff,
+  PhoneOff,
+  Settings,
+  Video,
+  VideoOff,
+  User,
+  ChevronDown,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useAppDispatch, useAppSelector } from "../app/hooks";
@@ -52,15 +61,22 @@ async function joinRoom(
     })) as CommandResponse;
 
     const status = response.status;
-    const encryptedRoomKey = response.room_key as string | undefined;
-    const serverPubKey = response.server_pub_key as string | undefined;
     const message = response.message ?? "";
+    const serverPubKey = response.server_pub_key as string | undefined;
+
+    let roomKey = "no-key";
+    if (response.room_key) {
+      try {
+        roomKey = await decryptRoomKey(
+          response.room_key as string,
+          serverPubKey,
+        );
+      } catch (err) {
+        console.warn("[MeetingRoom] Failed to decrypt room key:", err);
+      }
+    }
 
     if (status === 0) {
-      const roomKey =
-        encryptedRoomKey && serverPubKey
-          ? await decryptRoomKey(encryptedRoomKey, serverPubKey)
-          : (encryptedRoomKey ?? "no-key");
       dispatch(setRoomInfo({ key: roomKey, status: "joined" }));
 
       await sendCommand(SocketCommands.JOIN_OR_MESSAGE, {
@@ -108,6 +124,72 @@ async function joinRoom(
   }
 }
 
+const RemoteVideo = ({
+  stream,
+  label,
+}: {
+  stream: MediaStream;
+  label?: string;
+}) => {
+  const ref = useRef<HTMLVideoElement>(null);
+  const audioTracks = stream.getAudioTracks();
+  const videoTracks = stream.getVideoTracks();
+
+  // Use state to track track-enablement changes (track objects themselves don't trigger re-renders)
+  const [hasVideo, setHasVideo] = useState(
+    videoTracks.length > 0 && videoTracks[0].enabled,
+  );
+  const [hasAudio, setHasAudio] = useState(
+    audioTracks.length > 0 && audioTracks[0].enabled,
+  );
+
+  useEffect(() => {
+    if (ref.current && stream) {
+      ref.current.srcObject = stream;
+    }
+
+    // Monitor track enablement because it doesn't trigger standard React cycles
+    const interval = setInterval(() => {
+      setHasVideo(videoTracks.length > 0 && videoTracks[0].enabled);
+      setHasAudio(audioTracks.length > 0 && audioTracks[0].enabled);
+    }, 500);
+    return () => clearInterval(interval);
+  }, [stream, videoTracks, audioTracks]);
+
+  return (
+    <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-xl bg-slate-800 shadow-inner">
+      <video
+        ref={ref}
+        autoPlay
+        playsInline
+        className={clsx(
+          "absolute inset-0 h-full w-full object-cover",
+          !hasVideo && "opacity-0",
+        )}
+      />
+
+      {!hasVideo && (
+        <div className="relative z-10 flex flex-col items-center gap-2">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-sky-500/10 text-sky-400">
+            {hasAudio ? (
+              <Mic size={32} />
+            ) : (
+              <MicOff size={32} className="text-rose-500" />
+            )}
+          </div>
+          <span className="text-[10px] font-medium text-slate-400">
+            {hasAudio ? "Audio Only" : "Muted / No Media"}
+          </span>
+        </div>
+      )}
+      <div className="absolute bottom-2 left-2 flex items-center gap-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">
+        {!hasAudio && <MicOff size={10} className="text-rose-500" />}
+        {label}
+      </div>
+    </div>
+  );
+};
+
 export function MeetingRoomPage() {
   const { roomName = "" } = useParams();
   const dispatch = useAppDispatch();
@@ -121,12 +203,27 @@ export function MeetingRoomPage() {
     acceptCall,
     rejectCall,
     hangUp,
+    toggleMicrophone,
+    toggleCamera,
+    switchDevice,
+    getDevices,
     localStream,
-    remoteStream,
+    remoteStreams,
   } = useWebRTC();
 
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [availableDevices, setAvailableDevices] = useState<{
+    audioInputs: MediaDeviceInfo[];
+    videoInputs: MediaDeviceInfo[];
+  }>({ audioInputs: [], videoInputs: [] });
+
+  useEffect(() => {
+    if (isSettingsOpen) {
+      getDevices().then(setAvailableDevices);
+    }
+  }, [isSettingsOpen, getDevices]);
+
   const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
   const isDark = resolvedTheme === "dark";
   const normalizedRoomName = normalizeMeetingName(roomName);
@@ -145,7 +242,8 @@ export function MeetingRoomPage() {
       socketState !== "connected" ||
       hasJoinedRef.current ||
       chatState.roomStatus === "joined" ||
-      chatState.roomStatus === "joining"
+      chatState.roomStatus === "joining" ||
+      chatState.roomStatus === "error"
     )
       return;
 
@@ -170,17 +268,10 @@ export function MeetingRoomPage() {
 
   // Handle Video Streams
   useEffect(() => {
-    if (callState.status === "connected" || callState.status === "calling") {
-      if (localVideoRef.current && localStream) {
-        localVideoRef.current.srcObject = localStream;
-      }
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
     }
-    if (callState.status === "connected") {
-      if (remoteVideoRef.current && remoteStream) {
-        remoteVideoRef.current.srcObject = remoteStream;
-      }
-    }
-  }, [callState.status, localStream, remoteStream]);
+  }, [localStream, callState.status]);
 
   // 2. Lifecycle adapter: Leave ONLY on actual unmount
   const leaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -268,18 +359,32 @@ export function MeetingRoomPage() {
           <div className="flex items-center gap-2">
             {chatState.roomStatus === "joined" &&
               callState.status === "idle" && (
-                <button
-                  onClick={startCall}
-                  className={clsx(
-                    "flex h-10 w-10 items-center justify-center rounded-full transition-all hover:scale-110 active:scale-95",
-                    isDark
-                      ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-                      : "bg-emerald-100 text-emerald-600 hover:bg-emerald-200",
-                  )}
-                  title="Start Video Call"
-                >
-                  <Video size={20} />
-                </button>
+                <>
+                  <button
+                    onClick={() => startCall("voice")}
+                    className={clsx(
+                      "flex h-10 w-10 items-center justify-center rounded-full transition-all hover:scale-110 active:scale-95",
+                      isDark
+                        ? "bg-sky-500/10 text-sky-400 hover:bg-sky-500/20"
+                        : "bg-sky-100 text-sky-600 hover:bg-sky-200",
+                    )}
+                    title="Start Voice Call"
+                  >
+                    <Mic size={20} />
+                  </button>
+                  <button
+                    onClick={() => startCall("video")}
+                    className={clsx(
+                      "flex h-10 w-10 items-center justify-center rounded-full transition-all hover:scale-110 active:scale-95",
+                      isDark
+                        ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                        : "bg-emerald-100 text-emerald-600 hover:bg-emerald-200",
+                    )}
+                    title="Start Video Call"
+                  >
+                    <Video size={20} />
+                  </button>
+                </>
               )}
             <ThemeToggle />
           </div>
@@ -307,92 +412,277 @@ export function MeetingRoomPage() {
           >
             <div className="mb-6 flex flex-col items-center gap-4">
               <div className="flex h-20 w-20 items-center justify-center rounded-full bg-sky-500/20 text-sky-500">
-                <Video size={40} />
+                {callState.callType === "video" ? (
+                  <Video size={40} />
+                ) : (
+                  <Mic size={40} />
+                )}
               </div>
               <div className="text-center">
                 <h2 className="text-xl font-bold">
                   {callState.status === "incoming"
-                    ? "Incoming Call"
+                    ? `Incoming ${callState.callType} Call`
                     : callState.status === "calling"
-                      ? "Calling..."
-                      : "Call Connected"}
+                      ? `Calling (${callState.callType})...`
+                      : `Call Connected (${callState.callType})`}
                 </h2>
                 <p className={isDark ? "text-slate-400" : "text-slate-500"}>
                   {callState.peerId || "Remote Peer"}
                 </p>
               </div>
             </div>
-
             {callState.status === "connected" && (
-              <div className="mb-8 grid w-full grid-cols-2 gap-4">
-                <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-800 shadow-inner">
-                  <video
-                    ref={remoteVideoRef}
-                    autoPlay
-                    playsInline
-                    className="h-full w-full object-cover"
+              <div
+                className={clsx(
+                  "mb-8 grid w-full gap-4",
+                  remoteStreams.size === 0
+                    ? "grid-cols-1"
+                    : remoteStreams.size === 1
+                      ? "grid-cols-2"
+                      : "grid-cols-2 sm:grid-cols-3",
+                )}
+              >
+                {Array.from(remoteStreams.entries()).map(([peerId, stream]) => (
+                  <RemoteVideo
+                    key={peerId}
+                    stream={stream}
+                    label={`Remote (${peerId.slice(0, 4)})`}
                   />
-                  <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">
-                    Remote
-                  </div>
-                </div>
+                ))}
+
                 <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-800 shadow-inner">
-                  <video
-                    ref={localVideoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="h-full w-full object-cover"
-                  />
-                  <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">
+                  {callState.callType === "video" ? (
+                    <video
+                      ref={localVideoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-slate-900">
+                      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-sky-500/10 text-sky-400">
+                        <User size={32} />
+                      </div>
+                    </div>
+                  )}
+                  <div className="absolute bottom-2 left-2 flex items-center gap-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     Local (You)
                   </div>
                 </div>
               </div>
-            )}
-
-            {callState.status === "calling" && (
-              <div className="mb-8 flex w-full justify-center">
-                <div className="relative aspect-video w-64 overflow-hidden rounded-xl bg-slate-800 shadow-inner">
-                  <video
-                    ref={localVideoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="h-full w-full object-cover"
-                  />
-                  <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">
-                    Preview
+            )}{" "}
+            function
+            {callState.status === "calling" &&
+              callState.callType === "video" && (
+                <div className="mb-8 flex w-full justify-center">
+                  <div className="relative aspect-video w-64 overflow-hidden rounded-xl bg-slate-800 shadow-inner">
+                    <video
+                      ref={localVideoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="h-full w-full object-cover"
+                    />
+                    <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">
+                      Preview
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-
-            <div className="flex items-center gap-4">
+              )}
+            <div className="flex items-center gap-6">
               {callState.status === "incoming" ? (
                 <>
                   <button
-                    onClick={() =>
-                      callState.offer && acceptCall(callState.offer)
-                    }
+                    onClick={() => acceptCall()}
                     className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 transition-transform hover:scale-110 active:scale-95"
+                    title="Accept Call"
                   >
-                    <Video size={24} />
+                    {callState.callType === "video" ? (
+                      <Video size={24} />
+                    ) : (
+                      <Mic size={24} />
+                    )}
                   </button>
                   <button
                     onClick={rejectCall}
                     className="flex h-14 w-14 items-center justify-center rounded-full bg-rose-500 text-white shadow-lg shadow-rose-500/30 transition-transform hover:scale-110 active:scale-95"
+                    title="Reject Call"
                   >
                     <PhoneOff size={24} />
                   </button>
                 </>
               ) : (
+                <div className="flex items-center gap-6">
+                  <button
+                    onClick={toggleMicrophone}
+                    className={clsx(
+                      "flex h-12 w-12 items-center justify-center rounded-full transition-all hover:scale-110 active:scale-95",
+                      callState.microphoneEnabled
+                        ? isDark
+                          ? "bg-slate-800 text-slate-200"
+                          : "bg-slate-100 text-slate-700"
+                        : "bg-rose-500 text-white",
+                    )}
+                    title={callState.microphoneEnabled ? "Mute" : "Unmute"}
+                  >
+                    {callState.microphoneEnabled ? (
+                      <Mic size={24} />
+                    ) : (
+                      <MicOff size={24} />
+                    )}
+                  </button>
+
+                  <button
+                    onClick={hangUp}
+                    className="flex h-14 w-14 items-center justify-center rounded-full bg-rose-500 text-white shadow-lg shadow-rose-500/30 transition-all hover:scale-110 hover:bg-rose-600 active:scale-95"
+                    title="End Call"
+                  >
+                    <PhoneOff size={28} />
+                  </button>
+
+                  {callState.callType === "video" && (
+                    <button
+                      onClick={toggleCamera}
+                      className={clsx(
+                        "flex h-12 w-12 items-center justify-center rounded-full transition-all hover:scale-110 active:scale-95",
+                        callState.cameraEnabled
+                          ? isDark
+                            ? "bg-slate-800 text-slate-200"
+                            : "bg-slate-100 text-slate-700"
+                          : "bg-rose-500 text-white",
+                      )}
+                      title={callState.cameraEnabled ? "Turn Off" : "Turn On"}
+                    >
+                      {callState.cameraEnabled ? (
+                        <Video size={24} />
+                      ) : (
+                        <VideoOff size={24} />
+                      )}
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => setIsSettingsOpen(true)}
+                    className={clsx(
+                      "flex h-12 w-12 items-center justify-center rounded-full transition-all hover:scale-110 active:scale-95",
+                      isDark
+                        ? "bg-slate-800 text-slate-200"
+                        : "bg-slate-100 text-slate-700",
+                    )}
+                    title="Media Settings"
+                  >
+                    <Settings size={24} />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Media Settings Dialog */}
+      {isSettingsOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm">
+          <div
+            className={clsx(
+              "w-full max-w-md rounded-3xl p-8 shadow-2xl transition-all",
+              isDark
+                ? "bg-slate-900 border border-white/10 text-white"
+                : "bg-white text-slate-900",
+            )}
+          >
+            <div className="mb-6 flex items-center justify-between">
+              <h3 className="text-xl font-bold">Media Settings</h3>
+              <button
+                onClick={() => setIsSettingsOpen(false)}
+                className="text-slate-400 hover:text-slate-200 transition-colors"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-400 uppercase tracking-wider">
+                  Microphone
+                </label>
+                <div className="relative group">
+                  <select
+                    className={clsx(
+                      "w-full appearance-none rounded-2xl border-none py-4 pl-5 pr-12 outline-none ring-1 transition-all",
+                      isDark
+                        ? "bg-slate-800 ring-slate-700 focus:ring-sky-500 text-slate-200"
+                        : "bg-slate-50 ring-slate-200 focus:ring-sky-500 text-slate-900",
+                    )}
+                    value={callState.selectedMicrophoneId || ""}
+                    onChange={(e) => switchDevice("audio", e.target.value)}
+                  >
+                    {availableDevices.audioInputs.map((d) => (
+                      <option key={d.deviceId} value={d.deviceId}>
+                        {d.label || `Microphone ${d.deviceId.slice(0, 4)}`}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    size={18}
+                    className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 transition-colors group-focus-within:text-sky-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-400 uppercase tracking-wider">
+                  Camera
+                </label>
+                <div className="relative group">
+                  <select
+                    className={clsx(
+                      "w-full appearance-none rounded-2xl border-none py-4 pl-5 pr-12 outline-none ring-1 transition-all",
+                      isDark
+                        ? "bg-slate-800 ring-slate-700 focus:ring-sky-500 text-slate-200"
+                        : "bg-slate-50 ring-slate-200 focus:ring-sky-500 text-slate-900",
+                    )}
+                    value={callState.selectedCameraId || ""}
+                    onChange={(e) => switchDevice("video", e.target.value)}
+                  >
+                    {availableDevices.videoInputs.map((d) => (
+                      <option key={d.deviceId} value={d.deviceId}>
+                        {d.label || `Camera ${d.deviceId.slice(0, 4)}`}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    size={18}
+                    className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 transition-colors group-focus-within:text-sky-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-10 flex gap-4">
+              <button
+                onClick={() => setIsSettingsOpen(false)}
+                className={clsx(
+                  "flex-1 rounded-2xl py-4 font-bold transition-all hover:bg-opacity-80 active:scale-95",
+                  isDark
+                    ? "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200",
+                )}
+              >
+                Done
+              </button>
+              {callState.status === "idle" && (
                 <button
-                  onClick={hangUp}
-                  className="flex h-14 w-40 items-center justify-center gap-3 rounded-full bg-rose-500 font-semibold text-white shadow-lg shadow-rose-500/30 transition-transform hover:scale-105 active:scale-95"
+                  onClick={() => {
+                    startCall(callState.callType);
+                    setIsSettingsOpen(false);
+                  }}
+                  className="flex-1 rounded-2xl bg-sky-500 py-4 font-bold text-white shadow-[0_8px_20px_-4px_rgba(14,165,233,0.4)] transition-all hover:scale-[1.02] hover:bg-sky-600 active:scale-95"
                 >
-                  <PhoneOff size={20} />
-                  <span>End Call</span>
+                  Join Call
                 </button>
               )}
             </div>
