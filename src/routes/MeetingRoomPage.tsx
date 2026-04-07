@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { PhoneOff, Video } from "lucide-react";
+import { PhoneOff, Video, Mic } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -119,6 +119,8 @@ const RemoteVideo = ({
   label?: string;
 }) => {
   const ref = useRef<HTMLVideoElement>(null);
+  const hasVideo = stream.getVideoTracks().length > 0;
+
   useEffect(() => {
     if (ref.current && stream) {
       ref.current.srcObject = stream;
@@ -126,13 +128,22 @@ const RemoteVideo = ({
   }, [stream]);
 
   return (
-    <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-800 shadow-inner">
-      <video
-        ref={ref}
-        autoPlay
-        playsInline
-        className="h-full w-full object-cover"
-      />
+    <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-800 shadow-inner flex items-center justify-center">
+      {hasVideo ? (
+        <video
+          ref={ref}
+          autoPlay
+          playsInline
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <div className="flex flex-col items-center gap-2">
+          <div className="h-16 w-16 rounded-full bg-sky-500/20 flex items-center justify-center text-sky-400">
+            <Mic size={32} />
+          </div>
+          <span className="text-[10px] text-slate-400 font-medium">Audio Only</span>
+        </div>
+      )}
       <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">
         {label}
       </div>
@@ -293,18 +304,32 @@ export function MeetingRoomPage() {
           <div className="flex items-center gap-2">
             {chatState.roomStatus === "joined" &&
               callState.status === "idle" && (
-                <button
-                  onClick={startCall}
-                  className={clsx(
-                    "flex h-10 w-10 items-center justify-center rounded-full transition-all hover:scale-110 active:scale-95",
-                    isDark
-                      ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-                      : "bg-emerald-100 text-emerald-600 hover:bg-emerald-200",
-                  )}
-                  title="Start Video Call"
-                >
-                  <Video size={20} />
-                </button>
+                <>
+                  <button
+                    onClick={() => startCall("voice")}
+                    className={clsx(
+                      "flex h-10 w-10 items-center justify-center rounded-full transition-all hover:scale-110 active:scale-95",
+                      isDark
+                        ? "bg-sky-500/10 text-sky-400 hover:bg-sky-500/20"
+                        : "bg-sky-100 text-sky-600 hover:bg-sky-200",
+                    )}
+                    title="Start Voice Call"
+                  >
+                    <Mic size={20} />
+                  </button>
+                  <button
+                    onClick={() => startCall("video")}
+                    className={clsx(
+                      "flex h-10 w-10 items-center justify-center rounded-full transition-all hover:scale-110 active:scale-95",
+                      isDark
+                        ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                        : "bg-emerald-100 text-emerald-600 hover:bg-emerald-200",
+                    )}
+                    title="Start Video Call"
+                  >
+                    <Video size={20} />
+                  </button>
+                </>
               )}
             <ThemeToggle />
           </div>
@@ -332,15 +357,19 @@ export function MeetingRoomPage() {
           >
             <div className="mb-6 flex flex-col items-center gap-4">
               <div className="flex h-20 w-20 items-center justify-center rounded-full bg-sky-500/20 text-sky-500">
-                <Video size={40} />
+                {callState.callType === "video" ? (
+                  <Video size={40} />
+                ) : (
+                  <Mic size={40} />
+                )}
               </div>
               <div className="text-center">
                 <h2 className="text-xl font-bold">
                   {callState.status === "incoming"
-                    ? "Incoming Call"
+                    ? `Incoming ${callState.callType} Call`
                     : callState.status === "calling"
-                      ? "Calling..."
-                      : "Call Connected"}
+                      ? `Calling (${callState.callType})...`
+                      : `Call Connected (${callState.callType})`}
                 </h2>
                 <p className={isDark ? "text-slate-400" : "text-slate-500"}>
                   {callState.peerId || "Remote Peer"}
@@ -358,22 +387,24 @@ export function MeetingRoomPage() {
                   />
                 ))}
 
-                <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-800 shadow-inner">
-                  <video
-                    ref={localVideoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="h-full w-full object-cover"
-                  />
-                  <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">
-                    Local (You)
+                {callState.callType === "video" && (
+                  <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-800 shadow-inner">
+                    <video
+                      ref={localVideoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="h-full w-full object-cover"
+                    />
+                    <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">
+                      Local (You)
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
 
-            {callState.status === "calling" && (
+            {callState.status === "calling" && callState.callType === "video" && (
               <div className="mb-8 flex w-full justify-center">
                 <div className="relative aspect-video w-64 overflow-hidden rounded-xl bg-slate-800 shadow-inner">
                   <video

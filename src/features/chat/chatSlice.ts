@@ -32,6 +32,7 @@ export interface CallState {
   status: "idle" | "calling" | "incoming" | "connected";
   peerId: string | null;
   isIncoming: boolean;
+  callType: "video" | "voice";
   offer?: RTCSessionDescriptionInit;
 }
 
@@ -86,6 +87,7 @@ const initialState: ChatState = {
     status: "idle",
     peerId: null,
     isIncoming: false,
+    callType: "video",
   },
 };
 

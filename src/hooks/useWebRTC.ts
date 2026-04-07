@@ -154,14 +154,17 @@ export function useWebRTC() {
           const decoded = decodeSignal(data.sdp);
           if (!decoded) return;
           const { targetUuid, realPayload } = decoded;
+          const isVideo = realPayload.startsWith("VIDEO_");
+          const pureAction = realPayload.replace(/^(VIDEO_|VOICE_)/, "");
 
-          if (realPayload === "CALL_RING" && targetUuid === "*") {
+          if (pureAction === "CALL_RING" && targetUuid === "*") {
             if (callState.status === "idle") {
               dispatch(
                 setCallStatus({
                   status: "incoming",
                   peerId: sender_uuid,
                   isIncoming: true,
+                  callType: isVideo ? "video" : "voice",
                 }),
               );
             } else if (
@@ -185,7 +188,7 @@ export function useWebRTC() {
             return;
           }
 
-          if (realPayload === "JOIN_REQUEST" && targetUuid === "*") {
+          if (pureAction === "JOIN_REQUEST" && targetUuid === "*") {
             // Someone joined the call. If I am in the call, I must create an OFFER for them
             if (
               callState.status === "connected" ||
@@ -296,22 +299,28 @@ export function useWebRTC() {
 
   useSocketEvent("SignalCallRelay", handleSignalEvent);
 
-  const startCall = async () => {
+  const startCall = async (type: "video" | "voice" = "video") => {
     try {
+      const isVideo = type === "video";
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
+        video: isVideo,
         audio: true,
       });
       setLocalStream(stream);
 
+      const prefix = isVideo ? "VIDEO_" : "VOICE_";
       await sendCommandRef.current(SocketCommands.SIGNAL_CALL, {
         action: SignalCallAction.OFFER,
-        data: { type: "offer", sdp: encodeSignal("*", "CALL_RING") },
+        data: { type: "offer", sdp: encodeSignal("*", `${prefix}CALL_RING`) },
       });
 
-      dispatch(setCallStatus({ status: "calling", isIncoming: false }));
+      dispatch(
+        setCallStatus({ status: "calling", isIncoming: false, callType: type }),
+      );
     } catch (err) {
-      toast.error("Failed to start call. Check your camera/microphone.");
+      toast.error(
+        `Failed to start ${type} call. Check your camera/microphone.`,
+      );
       console.error(err);
     }
   };
@@ -319,15 +328,17 @@ export function useWebRTC() {
   const acceptCall = async () => {
     try {
       stopRinging();
+      const isVideo = callState.callType === "video";
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
+        video: isVideo,
         audio: true,
       });
       setLocalStream(stream);
 
+      const prefix = isVideo ? "VIDEO_" : "VOICE_";
       await sendCommandRef.current(SocketCommands.SIGNAL_CALL, {
         action: SignalCallAction.OFFER, // Send JOIN_REQUEST using OFFER action
-        data: { type: "offer", sdp: encodeSignal("*", "JOIN_REQUEST") },
+        data: { type: "offer", sdp: encodeSignal("*", `${prefix}JOIN_REQUEST`) },
       });
 
       dispatch(setCallStatus({ status: "connected" }));
