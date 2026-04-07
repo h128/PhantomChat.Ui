@@ -61,29 +61,7 @@ export const presenceLabels: Record<PresenceMode, string> = {
 const initialState: ChatState = {
   presenceMode: "focused",
   activeRoomId: "launch-pad",
-  rooms: [
-    {
-      id: "launch-pad",
-      name: "Launch Pad",
-      topic: "Ship blockers, release timing, and cutover prep.",
-      members: 14,
-      unread: 7,
-    },
-    {
-      id: "signal-lab",
-      name: "Signal Lab",
-      topic: "User feedback triage and validation experiments.",
-      members: 8,
-      unread: 3,
-    },
-    {
-      id: "ops-watch",
-      name: "Ops Watch",
-      topic: "Deploy health, alerts, and overnight handoff notes.",
-      members: 5,
-      unread: 1,
-    },
-  ],
+  rooms: [],
   messages: {},
   roomKey: null,
   roomStatus: "idle",
