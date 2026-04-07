@@ -10,7 +10,9 @@ import themeReducer, {
 } from "./themeSlice";
 import type { RootState } from "../../app/store";
 
-function createRootState(themeState: ReturnType<typeof themeReducer>): RootState {
+function createRootState(
+  themeState: ReturnType<typeof themeReducer>,
+): RootState {
   return {
     chat: chatReducer(undefined, { type: "chat/init" }),
     theme: themeState,

@@ -24,6 +24,48 @@ function deriveKey(roomKey: string): Uint8Array {
   );
 }
 
+interface SodiumKeyPair {
+  keyType?: "curve25519" | "ed25519" | "x25519" | string;
+  publicKey: Uint8Array;
+  privateKey: Uint8Array;
+}
+
+let boxKeyPair: SodiumKeyPair | null = null;
+
+export async function getPublicKeyHex(): Promise<string> {
+  await ensureReady();
+  if (!boxKeyPair) {
+    boxKeyPair = sodium.crypto_box_keypair();
+  }
+  return sodium.to_hex(boxKeyPair.publicKey);
+}
+
+export async function decryptRoomKey(
+  encryptedHex: string,
+  serverPublicKeyHex?: string,
+): Promise<string> {
+  await ensureReady();
+  if (!boxKeyPair) {
+    throw new Error("KeyPair not initialized");
+  }
+
+  const ciphertext = sodium.from_hex(encryptedHex);
+  const nonce = new Uint8Array(sodium.crypto_box_NONCEBYTES); // Zeroed nonce as requested by backend
+
+  // Try decrypting. If the backend didn't provide its public key, we use a fallback or try our own.
+  const serverPubKey = serverPublicKeyHex
+    ? sodium.from_hex(serverPublicKeyHex)
+    : boxKeyPair.publicKey;
+  const decrypted = sodium.crypto_box_open_easy(
+    ciphertext,
+    nonce,
+    serverPubKey,
+    boxKeyPair.privateKey,
+  );
+
+  return sodium.to_string(decrypted);
+}
+
 /**
  * Encrypts data using libsodium secretbox.
  * Returns a single blob with the nonce prepended: [nonce | ciphertext].
