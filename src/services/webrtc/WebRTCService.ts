@@ -21,18 +21,33 @@ export class WebRTCService {
   private localStream: MediaStream | null = null;
   private onTrackCallback?: (stream: MediaStream) => void;
   private onIceCandidateCallback?: (candidate: RTCIceCandidate) => void;
+  private onDisconnectCallback?: () => void;
 
   constructor(
     onTrack?: (stream: MediaStream) => void,
     onIceCandidate?: (candidate: RTCIceCandidate) => void,
+    onDisconnect?: () => void,
   ) {
     this.onTrackCallback = onTrack;
     this.onIceCandidateCallback = onIceCandidate;
+    this.onDisconnectCallback = onDisconnect;
   }
 
   public async initialize(stream: MediaStream) {
     this.localStream = stream;
     this.pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+
+    // Handle connection state changes for automatic mesh pruning
+    this.pc.onconnectionstatechange = () => {
+      if (
+        this.pc &&
+        (this.pc.connectionState === "failed" ||
+          this.pc.connectionState === "disconnected" ||
+          this.pc.connectionState === "closed")
+      ) {
+        this.onDisconnectCallback?.();
+      }
+    };
 
     // Add local tracks
     this.localStream.getTracks().forEach((track) => {
@@ -107,6 +122,30 @@ export class WebRTCService {
     // DO NOT invoke track.stop() here because localStream is shared across multiple peers in a mesh!
     if (this.localStream) {
       this.localStream = null;
+    }
+  }
+
+  public isClosed(): boolean {
+    return this.pc === null || this.pc.signalingState === "closed";
+  }
+
+  public isFailed(): boolean {
+    return (
+      this.pc !== null &&
+      (this.pc.connectionState === "failed" ||
+        this.pc.connectionState === "disconnected")
+    );
+  }
+
+  public async replaceTrack(
+    kind: "audio" | "video",
+    newTrack: MediaStreamTrack,
+  ) {
+    if (!this.pc) return;
+    const senders = this.pc.getSenders();
+    const sender = senders.find((s) => s.track?.kind === kind);
+    if (sender) {
+      await sender.replaceTrack(newTrack);
     }
   }
 }

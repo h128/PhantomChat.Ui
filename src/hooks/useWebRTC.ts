@@ -98,6 +98,12 @@ export function useWebRTC() {
   const createPeer = useCallback(
     (peerId: string, currentLocalStream: MediaStream | null) => {
       let webrtc = peersRef.current.get(peerId);
+
+      if (webrtc && (webrtc.isClosed() || webrtc.isFailed())) {
+        webrtc.close();
+        webrtc = undefined;
+      }
+
       if (!webrtc) {
         webrtc = new WebRTCService(
           (stream) => {
@@ -109,16 +115,22 @@ export function useWebRTC() {
             dispatch(setCallStatus({ status: "connected" }));
           },
           (candidate) => {
-            sendCommandRef
-              .current(SocketCommands.SIGNAL_CALL, {
-                action: SignalCallAction.CANDIDATE,
-                data: {
-                  candidate: encodeSignal(peerId, candidate.candidate),
-                  sdpMid: candidate.sdpMid,
-                  sdpMLineIndex: candidate.sdpMLineIndex,
-                },
-              })
-              .catch(console.error);
+            sendCommandRef.current(SocketCommands.SIGNAL_CALL, {
+              action: SignalCallAction.CANDIDATE,
+              data: {
+                candidate: encodeSignal(peerId, candidate.candidate),
+                sdpMid: candidate.sdpMid,
+                sdpMLineIndex: candidate.sdpMLineIndex,
+              },
+            }).catch(console.error);
+          },
+          () => {
+            // Abrupt disconnection handler:
+            removePeer(peerId);
+            // If the mesh is empty now, clear the call state entirely
+            if (peersRef.current.size === 0) {
+              dispatch(clearCall());
+            }
           },
         );
         peersRef.current.set(peerId, webrtc);
@@ -154,10 +166,15 @@ export function useWebRTC() {
           const decoded = decodeSignal(data.sdp);
           if (!decoded) return;
           const { targetUuid, realPayload } = decoded;
-          const isVideo = realPayload.startsWith("VIDEO_");
-          const pureAction = realPayload.replace(/^(VIDEO_|VOICE_)/, "");
 
-          if (pureAction === "CALL_RING" && targetUuid === "*") {
+          // Unify signaling: strip prefixes if they exist to handle mixed calls
+          const pureAction = realPayload.replace(/^(VIDEO_|VOICE_)/, "");
+          const isVideo = realPayload.startsWith("VIDEO_");
+
+          if (
+            (pureAction === "CALL_RING" || pureAction === "JOIN_REQUEST") &&
+            targetUuid === "*"
+          ) {
             if (callState.status === "idle") {
               dispatch(
                 setCallStatus({
@@ -167,11 +184,12 @@ export function useWebRTC() {
                   callType: isVideo ? "video" : "voice",
                 }),
               );
+              startRinging();
             } else if (
               callState.status === "connected" ||
               callState.status === "calling"
             ) {
-              // Already in the call. Treat their CALL_RING exactly like a JOIN_REQUEST to pull them in.
+              // Existing member in the call: Pull the newcomer in regardless of their prefix
               dispatch(setCallStatus({ status: "connected" }));
               const webrtc = createPeer(sender_uuid, localStream);
               const offer = await webrtc.createOffer();
@@ -188,30 +206,8 @@ export function useWebRTC() {
             return;
           }
 
-          if (pureAction === "JOIN_REQUEST" && targetUuid === "*") {
-            // Someone joined the call. If I am in the call, I must create an OFFER for them
-            if (
-              callState.status === "connected" ||
-              callState.status === "calling"
-            ) {
-              dispatch(setCallStatus({ status: "connected" })); // Clear my calling state since someone is here
-              const webrtc = createPeer(sender_uuid, localStream);
-              const offer = await webrtc.createOffer();
-              await sendCommandRef
-                .current(SocketCommands.SIGNAL_CALL, {
-                  action: SignalCallAction.OFFER,
-                  data: {
-                    type: offer.type,
-                    sdp: encodeSignal(sender_uuid, offer.sdp!),
-                  },
-                })
-                .catch(console.error);
-            }
-            return;
-          }
-
-          // Must be a real MESH targeted offer
-          if (targetUuid !== myId) return; // Not for me
+          // Must be a real MESH targeted offer (direct SDP)
+          if (targetUuid !== myId) return;
           const webrtc = createPeer(sender_uuid, localStream);
           await webrtc.setAnswer({ type: "offer", sdp: realPayload });
           const answer = await webrtc.createAnswer({
@@ -302,10 +298,31 @@ export function useWebRTC() {
   const startCall = async (type: "video" | "voice" = "video") => {
     try {
       const isVideo = type === "video";
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: isVideo,
-        audio: true,
-      });
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const hasMic = devices.some((d) => d.kind === "audioinput");
+      const hasCam = devices.some((d) => d.kind === "videoinput");
+
+      if (!hasMic) {
+        toast.error("Microphone not found. Please connect it to join.");
+        return;
+      }
+      if (isVideo && !hasCam) {
+        toast.error("Camera not found. Video calls require a camera.");
+        return;
+      }
+
+      const constraints: MediaStreamConstraints = {
+        audio: callState.selectedMicrophoneId
+          ? { deviceId: { exact: callState.selectedMicrophoneId } }
+          : true,
+        video: isVideo
+          ? callState.selectedCameraId
+            ? { deviceId: { exact: callState.selectedCameraId } }
+            : true
+          : false,
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       setLocalStream(stream);
 
       const prefix = isVideo ? "VIDEO_" : "VOICE_";
@@ -329,10 +346,31 @@ export function useWebRTC() {
     try {
       stopRinging();
       const isVideo = callState.callType === "video";
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: isVideo,
-        audio: true,
-      });
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const hasMic = devices.some((d) => d.kind === "audioinput");
+      const hasCam = devices.some((d) => d.kind === "videoinput");
+
+      if (!hasMic) {
+        toast.error("Microphone not found.");
+        return;
+      }
+      if (isVideo && !hasCam) {
+        toast.error("Camera not found.");
+        return;
+      }
+
+      const constraints: MediaStreamConstraints = {
+        audio: callState.selectedMicrophoneId
+          ? { deviceId: { exact: callState.selectedMicrophoneId } }
+          : true,
+        video: isVideo
+          ? callState.selectedCameraId
+            ? { deviceId: { exact: callState.selectedCameraId } }
+            : true
+          : false,
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       setLocalStream(stream);
 
       const prefix = isVideo ? "VIDEO_" : "VOICE_";
@@ -370,12 +408,106 @@ export function useWebRTC() {
     });
   };
 
+  const toggleMicrophone = useCallback(() => {
+    const newVal = !callState.microphoneEnabled;
+    dispatch(setCallStatus({ microphoneEnabled: newVal }));
+    if (localStream) {
+      localStream.getAudioTracks().forEach((t) => (t.enabled = newVal));
+    }
+  }, [callState.microphoneEnabled, localStream, dispatch]);
+
+  const toggleCamera = useCallback(() => {
+    const newVal = !callState.cameraEnabled;
+    dispatch(setCallStatus({ cameraEnabled: newVal }));
+    if (localStream) {
+      localStream.getVideoTracks().forEach((t) => (t.enabled = newVal));
+    }
+  }, [callState.cameraEnabled, localStream, dispatch]);
+
+  const switchDevice = useCallback(
+    async (kind: "audio" | "video", deviceId: string) => {
+      if (!localStream) return;
+
+      const isVideo = kind === "video";
+      const constraints = isVideo
+        ? { video: { deviceId: { exact: deviceId } } }
+        : { audio: { deviceId: { exact: deviceId } } };
+
+      try {
+        const newMedia = await navigator.mediaDevices.getUserMedia(constraints);
+        const newTrack = isVideo
+          ? newMedia.getVideoTracks()[0]
+          : newMedia.getAudioTracks()[0];
+
+        if (!newTrack) return;
+
+        // 1. Replace in all active Mesh peer connections
+        const replacePromises: Promise<void>[] = [];
+        peersRef.current.forEach((pc) => {
+          replacePromises.push(pc.replaceTrack(kind, newTrack));
+        });
+        await Promise.all(replacePromises);
+
+        // 2. Local stream update
+        const oldTrack = isVideo
+          ? localStream.getVideoTracks()[0]
+          : localStream.getAudioTracks()[0];
+
+        if (oldTrack) {
+          oldTrack.stop();
+          localStream.removeTrack(oldTrack);
+        }
+        localStream.addTrack(newTrack);
+
+        // 3. Store update
+        if (isVideo) {
+          dispatch(setCallStatus({ selectedCameraId: deviceId }));
+        } else {
+          dispatch(setCallStatus({ selectedMicrophoneId: deviceId }));
+        }
+      } catch (err) {
+        toast.error(`Failed to switch ${kind} device.`);
+        console.error(err);
+      }
+    },
+    [localStream, dispatch],
+  );
+
+  const getDevices = useCallback(async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioInputs = devices.filter((d) => d.kind === "audioinput");
+      const videoInputs = devices.filter((d) => d.kind === "videoinput");
+
+      // Auto-select if only one
+      if (audioInputs.length === 1 && !callState.selectedMicrophoneId) {
+        dispatch(setCallStatus({ selectedMicrophoneId: audioInputs[0].deviceId }));
+      }
+      if (videoInputs.length === 1 && !callState.selectedCameraId) {
+        dispatch(setCallStatus({ selectedCameraId: videoInputs[0].deviceId }));
+      }
+
+      return { audioInputs, videoInputs };
+    } catch (err) {
+      console.error("Failed to enumerate devices:", err);
+      return { audioInputs: [], videoInputs: [] };
+    }
+  }, [
+    callState.selectedMicrophoneId,
+    callState.selectedCameraId,
+    dispatch,
+  ]);
+
   return {
     callState,
     startCall,
-    acceptCall, // Removed the offer parameter, it's automatic now!
+    acceptCall,
     rejectCall,
     hangUp,
+    toggleMicrophone,
+    toggleCamera,
+    switchDevice,
+    getDevices,
     localStream,
     remoteStreams,
   };

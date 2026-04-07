@@ -33,6 +33,10 @@ export interface CallState {
   peerId: string | null;
   isIncoming: boolean;
   callType: "video" | "voice";
+  microphoneEnabled: boolean;
+  cameraEnabled: boolean;
+  selectedMicrophoneId: string | null;
+  selectedCameraId: string | null;
   offer?: RTCSessionDescriptionInit;
 }
 
@@ -88,6 +92,10 @@ const initialState: ChatState = {
     peerId: null,
     isIncoming: false,
     callType: "video",
+    microphoneEnabled: true,
+    cameraEnabled: true,
+    selectedMicrophoneId: null,
+    selectedCameraId: null,
   },
 };
 
