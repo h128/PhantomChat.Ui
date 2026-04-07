@@ -1,5 +1,14 @@
 import clsx from "clsx";
-import { PhoneOff, Video, Mic, MicOff, VideoOff, Settings, ChevronDown } from "lucide-react";
+import {
+  Mic,
+  MicOff,
+  PhoneOff,
+  Settings,
+  Video,
+  VideoOff,
+  User,
+  ChevronDown,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -417,7 +426,12 @@ export function MeetingRoomPage() {
             </div>
 
             {callState.status === "connected" && (
-              <div className="mb-8 grid w-full grid-cols-2 gap-4">
+              <div className={clsx(
+                "mb-8 grid w-full gap-4",
+                remoteStreams.size === 0 ? "grid-cols-1" :
+                remoteStreams.size === 1 ? "grid-cols-2" :
+                "grid-cols-2 sm:grid-cols-3"
+              )}>
                 {Array.from(remoteStreams.entries()).map(([peerId, stream]) => (
                   <RemoteVideo
                     key={peerId}
@@ -426,8 +440,8 @@ export function MeetingRoomPage() {
                   />
                 ))}
 
-                {callState.callType === "video" && (
-                  <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-800 shadow-inner">
+                <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-800 shadow-inner">
+                  {callState.callType === "video" ? (
                     <video
                       ref={localVideoRef}
                       autoPlay
@@ -435,13 +449,20 @@ export function MeetingRoomPage() {
                       muted
                       className="h-full w-full object-cover"
                     />
-                    <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">
-                      Local (You)
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-slate-900">
+                      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-sky-500/10 text-sky-400">
+                        <User size={32} />
+                      </div>
                     </div>
+                  )}
+                  <div className="absolute bottom-2 left-2 flex items-center gap-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Local (You)
                   </div>
-                )}
+                </div>
               </div>
-            )}
+            )} function
 
             {callState.status === "calling" && callState.callType === "video" && (
               <div className="mb-8 flex w-full justify-center">

@@ -15,7 +15,7 @@ export interface Room {
 export interface FileAttachment {
   fileName: string;
   originalName: string;
-  type: "image" | "file";
+  type: "image" | "file" | "audio";
   thumbnailFile?: string;
 }
 

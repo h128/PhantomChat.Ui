@@ -186,11 +186,11 @@ export function useWebRTC() {
               );
               startRinging();
             } else if (
-              callState.status === "connected" ||
-              callState.status === "calling"
+              (callState.status === "connected" ||
+                callState.status === "calling") &&
+              localStream
             ) {
               // Existing member in the call: Pull the newcomer in regardless of their prefix
-              dispatch(setCallStatus({ status: "connected" }));
               const webrtc = createPeer(sender_uuid, localStream);
               const offer = await webrtc.createOffer();
               await sendCommandRef
