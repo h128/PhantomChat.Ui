@@ -13,6 +13,7 @@ import { SocketCommands } from "../services/socket/SocketCommands";
 import type { CommandResponse } from "../services/socket/types";
 import { getPersistentUserId } from "../utils/user";
 import { useWebRTC } from "../hooks/useWebRTC";
+import { getPublicKeyHex, decryptRoomKey } from "../services/crypto";
 
 function normalizeMeetingName(value: string) {
   return value
@@ -42,18 +43,28 @@ async function joinRoom(
   retryOnConflict = true,
 ): Promise<void> {
   try {
+    const myPublicKey = await getPublicKeyHex();
     const response = (await sendCommand(SocketCommands.CREATE_ROOM, {
       user_uuid: getPersistentUserId(),
       room_name: normalizedRoomName,
-      public_key: "standard-v1-key",
+      public_key: myPublicKey,
     })) as CommandResponse;
 
     const status = response.status;
-    const roomKey = response.room_key as string | undefined;
     const message = response.message ?? "";
+    const serverPubKey = response.public_key as string | undefined;
+
+    let roomKey = "no-key";
+    if (response.room_key) {
+      try {
+         roomKey = await decryptRoomKey(response.room_key as string, serverPubKey);
+      } catch (err) {
+         console.warn("[MeetingRoom] Failed to decrypt room key:", err);
+      }
+    }
 
     if (status === 0) {
-      dispatch(setRoomInfo({ key: roomKey ?? "no-key", status: "joined" }));
+      dispatch(setRoomInfo({ key: roomKey, status: "joined" }));
 
       await sendCommand(SocketCommands.JOIN_OR_MESSAGE, {
         user_uuid: getPersistentUserId(),
@@ -165,7 +176,8 @@ export function MeetingRoomPage() {
       socketState !== "connected" ||
       hasJoinedRef.current ||
       chatState.roomStatus === "joined" ||
-      chatState.roomStatus === "joining"
+      chatState.roomStatus === "joining" ||
+      chatState.roomStatus === "error"
     )
       return;
 

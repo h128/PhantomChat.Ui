@@ -13,6 +13,7 @@ import { SocketCommands } from "../services/socket/SocketCommands";
 import type { RoomResponse } from "../services/socket/types";
 import { getPersistentUserId } from "../utils/user";
 import { generateRandomRoomName } from "../utils/randomRoomName";
+import { getPublicKeyHex, decryptRoomKey } from "../services/crypto";
 
 function normalizeMeetingName(value: string) {
   return value
@@ -50,23 +51,36 @@ export function HomePage() {
     try {
       dispatch(setRoomInfo({ key: "", status: "joining" }));
 
+      const myPublicKey = await getPublicKeyHex();
+
       // Full payload as requested by user for Create/Join
       const payload = {
         command: SocketCommands.CREATE_ROOM,
         user_uuid: getPersistentUserId(), // Dynamic persistent ID per browser
         room_name: normalizedRoomName,
-        public_key: "standard-v1-key", // Required by backend
+        public_key: myPublicKey,
       };
 
       const response = (await sendCommand(payload.command, {
         user_uuid: payload.user_uuid,
         room_name: payload.room_name,
         public_key: payload.public_key,
-      })) as RoomResponse;
+      })) as RoomResponse & { public_key?: string };
+
+      const serverPubKey = response.public_key;
+      let roomKey = "no-key";
+
+      if (response.room_key) {
+        try {
+          roomKey = await decryptRoomKey(response.room_key, serverPubKey);
+        } catch (err) {
+          console.warn("[HomePage] Failed to decrypt room key:", err);
+        }
+      }
 
       dispatch(
         setRoomInfo({
-          key: response.room_key || "no-key",
+          key: roomKey,
           status: "joined",
         }),
       );
