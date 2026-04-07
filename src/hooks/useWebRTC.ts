@@ -115,14 +115,16 @@ export function useWebRTC() {
             dispatch(setCallStatus({ status: "connected" }));
           },
           (candidate) => {
-            sendCommandRef.current(SocketCommands.SIGNAL_CALL, {
-              action: SignalCallAction.CANDIDATE,
-              data: {
-                candidate: encodeSignal(peerId, candidate.candidate),
-                sdpMid: candidate.sdpMid,
-                sdpMLineIndex: candidate.sdpMLineIndex,
-              },
-            }).catch(console.error);
+            sendCommandRef
+              .current(SocketCommands.SIGNAL_CALL, {
+                action: SignalCallAction.CANDIDATE,
+                data: {
+                  candidate: encodeSignal(peerId, candidate.candidate),
+                  sdpMid: candidate.sdpMid,
+                  sdpMLineIndex: candidate.sdpMLineIndex,
+                },
+              })
+              .catch(console.error);
           },
           () => {
             // Abrupt disconnection handler:
@@ -376,7 +378,10 @@ export function useWebRTC() {
       const prefix = isVideo ? "VIDEO_" : "VOICE_";
       await sendCommandRef.current(SocketCommands.SIGNAL_CALL, {
         action: SignalCallAction.OFFER, // Send JOIN_REQUEST using OFFER action
-        data: { type: "offer", sdp: encodeSignal("*", `${prefix}JOIN_REQUEST`) },
+        data: {
+          type: "offer",
+          sdp: encodeSignal("*", `${prefix}JOIN_REQUEST`),
+        },
       });
 
       dispatch(setCallStatus({ status: "connected" }));
@@ -481,7 +486,9 @@ export function useWebRTC() {
 
       // Auto-select if only one
       if (audioInputs.length === 1 && !callState.selectedMicrophoneId) {
-        dispatch(setCallStatus({ selectedMicrophoneId: audioInputs[0].deviceId }));
+        dispatch(
+          setCallStatus({ selectedMicrophoneId: audioInputs[0].deviceId }),
+        );
       }
       if (videoInputs.length === 1 && !callState.selectedCameraId) {
         dispatch(setCallStatus({ selectedCameraId: videoInputs[0].deviceId }));
@@ -492,11 +499,7 @@ export function useWebRTC() {
       console.error("Failed to enumerate devices:", err);
       return { audioInputs: [], videoInputs: [] };
     }
-  }, [
-    callState.selectedMicrophoneId,
-    callState.selectedCameraId,
-    dispatch,
-  ]);
+  }, [callState.selectedMicrophoneId, callState.selectedCameraId, dispatch]);
 
   return {
     callState,

@@ -40,19 +40,29 @@ export async function getPublicKeyHex(): Promise<string> {
   return sodium.to_hex(boxKeyPair.publicKey);
 }
 
-export async function decryptRoomKey(encryptedHex: string, serverPublicKeyHex?: string): Promise<string> {
+export async function decryptRoomKey(
+  encryptedHex: string,
+  serverPublicKeyHex?: string,
+): Promise<string> {
   await ensureReady();
   if (!boxKeyPair) {
     throw new Error("KeyPair not initialized");
   }
-  
+
   const ciphertext = sodium.from_hex(encryptedHex);
   const nonce = new Uint8Array(sodium.crypto_box_NONCEBYTES); // Zeroed nonce as requested by backend
-  
+
   // Try decrypting. If the backend didn't provide its public key, we use a fallback or try our own.
-  const serverPubKey = serverPublicKeyHex ? sodium.from_hex(serverPublicKeyHex) : boxKeyPair.publicKey;
-  const decrypted = sodium.crypto_box_open_easy(ciphertext, nonce, serverPubKey, boxKeyPair.privateKey);
-  
+  const serverPubKey = serverPublicKeyHex
+    ? sodium.from_hex(serverPublicKeyHex)
+    : boxKeyPair.publicKey;
+  const decrypted = sodium.crypto_box_open_easy(
+    ciphertext,
+    nonce,
+    serverPubKey,
+    boxKeyPair.privateKey,
+  );
+
   return sodium.to_string(decrypted);
 }
 

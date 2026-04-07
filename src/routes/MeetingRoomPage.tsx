@@ -66,9 +66,12 @@ async function joinRoom(
     let roomKey = "no-key";
     if (response.room_key) {
       try {
-         roomKey = await decryptRoomKey(response.room_key as string, serverPubKey);
+        roomKey = await decryptRoomKey(
+          response.room_key as string,
+          serverPubKey,
+        );
       } catch (err) {
-         console.warn("[MeetingRoom] Failed to decrypt room key:", err);
+        console.warn("[MeetingRoom] Failed to decrypt room key:", err);
       }
     }
 
@@ -158,9 +161,12 @@ const RemoteVideo = ({
         ref={ref}
         autoPlay
         playsInline
-        className={clsx("absolute inset-0 h-full w-full object-cover", !hasVideo && "opacity-0")}
+        className={clsx(
+          "absolute inset-0 h-full w-full object-cover",
+          !hasVideo && "opacity-0",
+        )}
       />
-      
+
       {!hasVideo && (
         <div className="relative z-10 flex flex-col items-center gap-2">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-sky-500/10 text-sky-400">
@@ -377,7 +383,7 @@ export function MeetingRoomPage() {
                   >
                     <Video size={20} />
                   </button>
-                 </>
+                </>
               )}
             <ThemeToggle />
           </div>
@@ -424,14 +430,17 @@ export function MeetingRoomPage() {
                 </p>
               </div>
             </div>
-
             {callState.status === "connected" && (
-              <div className={clsx(
-                "mb-8 grid w-full gap-4",
-                remoteStreams.size === 0 ? "grid-cols-1" :
-                remoteStreams.size === 1 ? "grid-cols-2" :
-                "grid-cols-2 sm:grid-cols-3"
-              )}>
+              <div
+                className={clsx(
+                  "mb-8 grid w-full gap-4",
+                  remoteStreams.size === 0
+                    ? "grid-cols-1"
+                    : remoteStreams.size === 1
+                      ? "grid-cols-2"
+                      : "grid-cols-2 sm:grid-cols-3",
+                )}
+              >
                 {Array.from(remoteStreams.entries()).map(([peerId, stream]) => (
                   <RemoteVideo
                     key={peerId}
@@ -462,25 +471,25 @@ export function MeetingRoomPage() {
                   </div>
                 </div>
               </div>
-            )} function
-
-            {callState.status === "calling" && callState.callType === "video" && (
-              <div className="mb-8 flex w-full justify-center">
-                <div className="relative aspect-video w-64 overflow-hidden rounded-xl bg-slate-800 shadow-inner">
-                  <video
-                    ref={localVideoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="h-full w-full object-cover"
-                  />
-                  <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">
-                    Preview
+            )}{" "}
+            function
+            {callState.status === "calling" &&
+              callState.callType === "video" && (
+                <div className="mb-8 flex w-full justify-center">
+                  <div className="relative aspect-video w-64 overflow-hidden rounded-xl bg-slate-800 shadow-inner">
+                    <video
+                      ref={localVideoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="h-full w-full object-cover"
+                    />
+                    <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">
+                      Preview
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-
+              )}
             <div className="flex items-center gap-6">
               {callState.status === "incoming" ? (
                 <>
@@ -578,7 +587,9 @@ export function MeetingRoomPage() {
           <div
             className={clsx(
               "w-full max-w-md rounded-3xl p-8 shadow-2xl transition-all",
-              isDark ? "bg-slate-900 border border-white/10 text-white" : "bg-white text-slate-900",
+              isDark
+                ? "bg-slate-900 border border-white/10 text-white"
+                : "bg-white text-slate-900",
             )}
           >
             <div className="mb-6 flex items-center justify-between">
@@ -614,7 +625,10 @@ export function MeetingRoomPage() {
                       </option>
                     ))}
                   </select>
-                  <ChevronDown size={18} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 transition-colors group-focus-within:text-sky-500" />
+                  <ChevronDown
+                    size={18}
+                    className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 transition-colors group-focus-within:text-sky-500"
+                  />
                 </div>
               </div>
 
@@ -639,7 +653,10 @@ export function MeetingRoomPage() {
                       </option>
                     ))}
                   </select>
-                  <ChevronDown size={18} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 transition-colors group-focus-within:text-sky-500" />
+                  <ChevronDown
+                    size={18}
+                    className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 transition-colors group-focus-within:text-sky-500"
+                  />
                 </div>
               </div>
             </div>
