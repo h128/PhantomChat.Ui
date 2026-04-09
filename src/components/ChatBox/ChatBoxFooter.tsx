@@ -1,6 +1,8 @@
 import clsx from "clsx";
-import EmojiPicker, { Theme, type EmojiClickData } from "emoji-picker-react";
 import { Mic, Paperclip, Send, Smile, Trash2 } from "lucide-react";
+import { Suspense, lazy } from "react";
+
+const EmojiPicker = lazy(() => import("emoji-picker-react"));
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
@@ -215,7 +217,7 @@ export function ChatBoxFooter() {
     }
   };
 
-  const handleEmojiClick = (emojiData: EmojiClickData) => {
+  const handleEmojiClick = (emojiData: { emoji: string }) => {
     setValue((prev) => prev + emojiData.emoji);
   };
 
@@ -245,13 +247,16 @@ export function ChatBoxFooter() {
     >
       {showEmojiPicker && !isRecording && (
         <div ref={pickerRef} className="absolute bottom-full left-0 z-10 mb-2">
-          <EmojiPicker
-            theme={isDark ? Theme.DARK : Theme.LIGHT}
-            onEmojiClick={handleEmojiClick}
-            searchPlaceholder="Search Emoji"
-            width={350}
-            height={400}
-          />
+          <Suspense>
+            <EmojiPicker
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              theme={(isDark ? "dark" : "light") as any}
+              onEmojiClick={handleEmojiClick}
+              searchPlaceholder="Search Emoji"
+              width={350}
+              height={400}
+            />
+          </Suspense>
         </div>
       )}
 
