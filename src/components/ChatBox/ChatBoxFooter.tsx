@@ -13,6 +13,7 @@ import {
   setRoomInfo,
 } from "../../features/chat/chatSlice";
 import type { FileAttachment } from "../../features/chat/chatSlice";
+import { selectProfile } from "../../features/profile/profileSlice";
 import { useSocketCommand } from "../../hooks/useSocket";
 import { useVoiceRecorder } from "../../hooks/useVoiceRecorder";
 import { encryptFile, isEncryptionEnabled } from "../../services/crypto";
@@ -26,7 +27,7 @@ import {
   uploadFile,
 } from "../../services/fileUpload";
 import { SocketCommands } from "../../services/socket/SocketCommands";
-import { getPersistentUserId, getPersistentUserName } from "../../utils/user";
+import { getPersistentUserId } from "../../utils/user";
 import { useChatBox } from "./ChatBoxContext";
 
 function formatDuration(ms: number): string {
@@ -96,6 +97,7 @@ export function ChatBoxFooter() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const activeRoomId = useAppSelector(selectActiveRoomId);
+  const profile = useAppSelector(selectProfile);
   const roomKey = useAppSelector(selectRoomKey);
   const roomStatus = useAppSelector((state) => state.chat.roomStatus);
   const sendCommand = useSocketCommand();
@@ -110,7 +112,7 @@ export function ChatBoxFooter() {
         message: {
           id: generateUUID(),
           senderId: userId,
-          senderName: getPersistentUserName(),
+          senderName: profile.displayName,
           content: "",
           timestamp: new Date().toISOString(),
           attachment: {
@@ -139,14 +141,20 @@ export function ChatBoxFooter() {
     const userId = getPersistentUserId();
 
     // 1. Optimistic Update (Local UI)
-    dispatch(addMessage({ roomId: activeRoomId, content: trimmed }));
+    dispatch(
+      addMessage({
+        roomId: activeRoomId,
+        content: trimmed,
+        senderName: profile.displayName,
+      }),
+    );
     setValue("");
     setShowEmojiPicker(false);
 
     // 2. Network Sync (Socket)
     let response: CommandResponse | undefined;
     try {
-      response = (await sendCommand(SocketCommands.JOIN_OR_MESSAGE, {
+      response = (await sendCommand(SocketCommands.SEND_MESSAGE, {
         user_uuid: userId,
         room_name: activeRoomId,
         message: trimmed,
@@ -184,7 +192,7 @@ export function ChatBoxFooter() {
             message: {
               id: generateUUID(),
               senderId: userId,
-              senderName: getPersistentUserName(),
+              senderName: profile.displayName,
               content: "",
               timestamp: new Date().toISOString(),
               attachment,

@@ -3,15 +3,18 @@ import { Download, FileIcon, Pause, Play, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAppSelector } from "../../app/hooks";
+import { UserAvatar } from "../../components/UserAvatar";
 import {
   selectActiveRoomId,
   selectActiveRoomMessages,
+  selectActiveRoomMembers,
   selectRoomKey,
 } from "../../features/chat/chatSlice";
+import { selectProfile } from "../../features/profile/profileSlice";
 import type { FileAttachment } from "../../features/chat/chatSlice";
 import { decryptFile, isEncryptionEnabled } from "../../services/crypto";
 import { downloadFile } from "../../services/fileUpload";
-import { getPersistentUserId } from "../../utils/user";
+import { deriveDisplayNameFromUserId, getPersistentUserId } from "../../utils/user";
 import { useChatBox } from "./ChatBoxContext";
 
 function formatTime(isoString: string) {
@@ -390,6 +393,8 @@ export function ChatBoxBody() {
   const { isDark } = useChatBox();
   const messages = useAppSelector(selectActiveRoomMessages);
   const activeRoomId = useAppSelector(selectActiveRoomId);
+  const roomMembers = useAppSelector(selectActiveRoomMembers);
+  const profile = useAppSelector(selectProfile);
   const roomKey = useAppSelector(selectRoomKey);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -416,6 +421,13 @@ export function ChatBoxBody() {
     <div className="flex-1 space-y-2 overflow-y-auto px-3 py-4 sm:px-5">
       {messages.map((msg) => {
         const isOwn = msg.senderId === getPersistentUserId();
+        const roomMember = roomMembers[msg.senderId];
+        const resolvedDisplayName = isOwn
+          ? profile.displayName || roomMember?.displayName || msg.senderName
+          : roomMember?.displayName || msg.senderName || deriveDisplayNameFromUserId(msg.senderId);
+        const resolvedAvatarId = isOwn
+          ? profile.avatarId ?? roomMember?.avatarId ?? null
+          : roomMember?.avatarId ?? null;
 
         return (
           <div
@@ -425,6 +437,7 @@ export function ChatBoxBody() {
             <div
               className={clsx(
                 "flex max-w-[75%] gap-3 rounded-2xl px-3.5 py-2.5",
+                isOwn && "flex-row-reverse",
                 isOwn
                   ? isDark
                     ? "bg-sky-400/15"
@@ -434,18 +447,12 @@ export function ChatBoxBody() {
                     : "bg-slate-100/80",
               )}
             >
-              {!isOwn && (
-                <div
-                  className={clsx(
-                    "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-semibold",
-                    isDark
-                      ? "bg-sky-400/15 text-sky-300"
-                      : "bg-[#3390ec]/10 text-[#3390ec]",
-                  )}
-                >
-                  {msg.senderName.charAt(0).toUpperCase()}
-                </div>
-              )}
+              <UserAvatar
+                avatarId={resolvedAvatarId}
+                displayName={resolvedDisplayName}
+                isDark={isDark}
+                className="mt-0.5 h-9 w-9 shrink-0"
+              />
               <div className="min-w-0">
                 <div
                   className={clsx(
@@ -465,7 +472,7 @@ export function ChatBoxBody() {
                           : "text-slate-900",
                     )}
                   >
-                    {msg.senderName}
+                    {resolvedDisplayName}
                   </span>
                   <span
                     className={clsx(

@@ -1,19 +1,16 @@
 import clsx from "clsx";
 import { type FormEvent, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useAppDispatch, useAppSelector } from "../app/hooks";
+import { AvatarPicker } from "../components/AvatarPicker";
 import { MeetingActionButton } from "../components/MeetingActionButton";
 import { MeetingNameInput } from "../components/MeetingNameInput";
 import { ThemeToggle } from "../components/ThemeToggle";
-import { setRoomInfo } from "../features/chat/chatSlice";
+import { UserAvatar } from "../components/UserAvatar";
+import { selectProfile, setProfile } from "../features/profile/profileSlice";
 import { selectResolvedTheme } from "../features/theme/themeSlice";
-import { useSocketCommand, useSocketState } from "../hooks/useSocket";
-import { SocketCommands } from "../services/socket/SocketCommands";
-import type { RoomResponse } from "../services/socket/types";
-import { getPersistentUserId } from "../utils/user";
 import { generateRandomRoomName } from "../utils/randomRoomName";
-import { getPublicKeyHex, decryptRoomKey } from "../services/crypto";
 
 function normalizeMeetingName(value: string) {
   return value
@@ -25,68 +22,52 @@ function normalizeMeetingName(value: string) {
 
 export function HomePage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const dispatch = useAppDispatch();
-  const socketState = useSocketState();
-  const sendCommand = useSocketCommand();
 
   const resolvedTheme = useAppSelector(selectResolvedTheme);
+  const profile = useAppSelector(selectProfile);
   const isDark = resolvedTheme === "dark";
-  const [roomName, setRoomName] = useState(generateRandomRoomName());
-  const [isJoining, setIsJoining] = useState(false);
+  const [roomName, setRoomName] = useState(
+    searchParams.get("room") || generateRandomRoomName(),
+  );
+  const [displayName, setDisplayName] = useState(profile.displayName);
+  const [selectedAvatarId, setSelectedAvatarId] = useState<number | null>(
+    profile.avatarId,
+  );
   const normalizedRoomName = normalizeMeetingName(roomName);
+  const normalizedDisplayName = displayName.trim().replace(/\s+/g, " ");
+  const canContinue =
+    Boolean(normalizedRoomName) &&
+    Boolean(normalizedDisplayName) &&
+    selectedAvatarId !== null;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!normalizedRoomName || isJoining) {
+    if (!normalizedRoomName) {
+      toast.error("Enter a room name to continue.");
       return;
     }
 
-    if (socketState !== "connected") {
-      toast.error("Socket is not connected. Please wait...");
+    if (!normalizedDisplayName) {
+      toast.error("Choose a nickname to continue.");
       return;
     }
 
-    setIsJoining(true);
-    try {
-      dispatch(setRoomInfo({ key: "", status: "joining" }));
-
-      const publicKey = await getPublicKeyHex();
-
-      const response = (await sendCommand(SocketCommands.CREATE_ROOM, {
-        user_uuid: getPersistentUserId(),
-        room_name: normalizedRoomName,
-        public_key: publicKey,
-      })) as RoomResponse;
-
-      let roomKey = "no-key";
-      if (response.room_key) {
-        try {
-          roomKey = await decryptRoomKey(
-            response.room_key,
-            response.server_pub_key,
-          );
-        } catch (err) {
-          console.warn("[HomePage] Failed to decrypt room key:", err);
-          roomKey = response.room_key;
-        }
-      }
-
-      dispatch(
-        setRoomInfo({
-          key: roomKey,
-          status: "joined",
-        }),
-      );
-
-      navigate(`/room/${normalizedRoomName}`);
-    } catch (err) {
-      dispatch(setRoomInfo({ key: "", status: "error" }));
-      console.error("Failed to join/create room:", err);
-      toast.error("Failed to join or create room. Please try again.");
-    } finally {
-      setIsJoining(false);
+    if (selectedAvatarId === null) {
+      toast.error("Select an avatar to continue.");
+      return;
     }
+
+    dispatch(
+      setProfile({
+        displayName: normalizedDisplayName,
+        avatarId: selectedAvatarId,
+      }),
+    );
+
+    navigate(`/room/${normalizedRoomName}`);
   }
 
   return (
@@ -174,45 +155,112 @@ export function HomePage() {
               >
                 Start or join a room and jump straight into the conversation
               </h1>
-              <form onSubmit={handleSubmit} className="mt-8">
-                <label
-                  htmlFor="room-name"
-                  className={clsx(
-                    "mb-3 block text-left text-sm font-medium",
-                    isDark ? "text-slate-400" : "text-slate-500",
-                  )}
-                >
-                  Room name
-                </label>
+              <form onSubmit={handleSubmit} className="mt-8 space-y-6">
+                <div>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="text-left">
+                      <p
+                        className={clsx(
+                          "text-sm font-medium",
+                          isDark ? "text-slate-400" : "text-slate-500",
+                        )}
+                      >
+                        Avatar
+                      </p>
+                      <p
+                        className={clsx(
+                          "text-xs",
+                          isDark ? "text-slate-500" : "text-slate-400",
+                        )}
+                      >
+                        Pick one from the built-in avatar set
+                      </p>
+                    </div>
+                  </div>
 
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <MeetingNameInput
-                    id="room-name"
-                    value={roomName}
-                    onChange={(event) => setRoomName(event.target.value)}
-                    placeholder="Enter a room name"
-                    aria-label="Meeting room name"
-                    autoComplete="off"
-                    autoCapitalize="off"
-                    spellCheck={false}
-                    className={clsx(
-                      isDark &&
-                        "border-slate-800 bg-slate-900/80 text-slate-100 placeholder:text-slate-500 focus:border-sky-400/60 focus:bg-slate-950 focus:ring-sky-400/10",
-                    )}
+                  <AvatarPicker
+                    selectedAvatarId={selectedAvatarId}
+                    onSelect={setSelectedAvatarId}
+                    isDark={isDark}
                   />
+                </div>
 
-                  <MeetingActionButton
-                    type="submit"
-                    disabled={!normalizedRoomName || isJoining}
+                <div>
+                  <label
+                    htmlFor="display-name"
                     className={clsx(
-                      "sm:w-36",
-                      isDark
-                        ? "bg-sky-400 text-slate-950 shadow-[0_16px_40px_rgba(56,189,248,0.2)] hover:bg-sky-300 disabled:bg-slate-800 disabled:text-slate-500 disabled:shadow-none"
-                        : "bg-[#3390ec] text-white shadow-[0_16px_40px_rgba(51,144,236,0.24)] hover:bg-[#2b82d9] disabled:bg-[#dce9f6] disabled:text-[#8fa7be] disabled:shadow-none",
+                      "mb-3 block text-left text-sm font-medium",
+                      isDark ? "text-slate-400" : "text-slate-500",
                     )}
                   >
-                    {isJoining ? "Joining..." : "Continue"}
-                  </MeetingActionButton>
+                    Nickname
+                  </label>
+
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <MeetingNameInput
+                      id="display-name"
+                      value={displayName}
+                      onChange={(event) => setDisplayName(event.target.value)}
+                      maxLength={64}
+                      placeholder="Choose how people will see you"
+                      autoComplete="nickname"
+                      className={clsx(
+                        "flex-1",
+                        isDark &&
+                          "border-slate-800 bg-slate-900/80 text-slate-100 placeholder:text-slate-500 focus:border-sky-400/60 focus:bg-slate-950 focus:ring-sky-400/10",
+                      )}
+                    />
+
+                    <UserAvatar
+                      avatarId={selectedAvatarId}
+                      displayName={normalizedDisplayName}
+                      isDark={isDark}
+                      className="h-14 w-14 rounded-[1.1rem] sm:h-14 sm:w-14"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="room-name"
+                    className={clsx(
+                      "mb-3 block text-left text-sm font-medium",
+                      isDark ? "text-slate-400" : "text-slate-500",
+                    )}
+                  >
+                    Room name
+                  </label>
+
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <MeetingNameInput
+                      id="room-name"
+                      value={roomName}
+                      onChange={(event) => setRoomName(event.target.value)}
+                      placeholder="Enter a room name"
+                      aria-label="Meeting room name"
+                      autoComplete="off"
+                      autoCapitalize="off"
+                      spellCheck={false}
+                      className={clsx(
+                        "flex-1",
+                        isDark &&
+                          "border-slate-800 bg-slate-900/80 text-slate-100 placeholder:text-slate-500 focus:border-sky-400/60 focus:bg-slate-950 focus:ring-sky-400/10",
+                      )}
+                    />
+
+                    <MeetingActionButton
+                      type="submit"
+                      disabled={!canContinue}
+                      className={clsx(
+                        "sm:w-36",
+                        isDark
+                          ? "bg-sky-400 text-slate-950 shadow-[0_16px_40px_rgba(56,189,248,0.2)] hover:bg-sky-300 disabled:bg-slate-800 disabled:text-slate-500 disabled:shadow-none"
+                          : "bg-[#3390ec] text-white shadow-[0_16px_40px_rgba(51,144,236,0.24)] hover:bg-[#2b82d9] disabled:bg-[#dce9f6] disabled:text-[#8fa7be] disabled:shadow-none",
+                      )}
+                    >
+                      Continue
+                    </MeetingActionButton>
+                  </div>
                 </div>
               </form>
 

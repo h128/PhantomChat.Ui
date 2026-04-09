@@ -1,16 +1,21 @@
 import { useDispatch, useSelector } from "react-redux";
-import { useSocketEvent } from "./useSocket";
 import {
   fileMessageReceived,
   messageReceived,
+  removeRoomMember,
   selectActiveRoomId,
+  setRoomMembers,
+  upsertRoomMember,
 } from "../features/chat/chatSlice";
-import { getPersistentUserId } from "../utils/user";
+import type { RoomMember } from "../features/chat/chatSlice";
+import { useSocketEvent } from "./useSocket";
+import { deriveDisplayNameFromUserId, getPersistentUserId } from "../utils/user";
 import { generateUUID } from "../utils/uuid";
 import type { ChatMessage } from "../features/chat/chatSlice";
 import type {
   FileUploadedPayload,
   NewMessagePayload,
+  RoomResponse,
   UserEnteredPayload,
 } from "../services/socket/types";
 
@@ -19,10 +24,46 @@ type BridgeMessageOptions = {
   getTimestamp?: () => string;
 };
 
+type BackendRoomMemberPayload = {
+  user_uuid: string;
+  display_name?: string;
+  avatar_id?: number;
+};
+
+type NormalizedRoomMemberPayload = {
+  userId: string;
+  displayName: string;
+  avatarId: number | null;
+};
+
 export function formatDisplayName(uuid: string) {
-  if (!uuid) return "Unknown";
-  const segments = uuid.split("_");
-  return `User ${segments[1] || uuid.substring(0, 5)}`;
+  return deriveDisplayNameFromUserId(uuid);
+}
+
+function isNormalizedRoomMember(
+  payload: BackendRoomMemberPayload | NormalizedRoomMemberPayload,
+): payload is NormalizedRoomMemberPayload {
+  return (
+    "userId" in payload &&
+    typeof payload.userId === "string" &&
+    typeof payload.displayName === "string" &&
+    (typeof payload.avatarId === "number" || payload.avatarId === null)
+  );
+}
+
+function toRoomMember(
+  payload: BackendRoomMemberPayload | NormalizedRoomMemberPayload,
+): RoomMember {
+  if (isNormalizedRoomMember(payload)) {
+    return payload;
+  }
+
+  return {
+    userId: payload.user_uuid,
+    displayName:
+      payload.display_name?.trim() || deriveDisplayNameFromUserId(payload.user_uuid),
+    avatarId: typeof payload.avatar_id === "number" ? payload.avatar_id : null,
+  };
 }
 
 function createBridgeMessageAction(
@@ -84,9 +125,16 @@ export function mapUserEnteredPayloadToAction(
     activeRoomId,
     "system",
     "System",
-    `${formatDisplayName(payload.user_uuid)} entered the room.`,
+    `${payload.display_name?.trim() || formatDisplayName(payload.user_uuid)} entered the room.`,
     options,
   );
+}
+
+export function mapRoomMembers(roomId: string, response: RoomResponse) {
+  return setRoomMembers({
+    roomId,
+    members: response.members.map((member) => toRoomMember(member)),
+  });
 }
 
 export function useChatSocketBridge() {
@@ -131,6 +179,14 @@ export function useChatSocketBridge() {
   // 4. User Entry Logic
   useSocketEvent("UserEnteredRoom", (payload: UserEnteredPayload) => {
     const currentUserId = getPersistentUserId();
+
+    dispatch(
+      upsertRoomMember({
+        roomId: payload.room_name || activeRoomId || "general",
+        member: toRoomMember(payload),
+      }),
+    );
+
     if (payload.user_uuid === currentUserId) return;
 
     handleIncomingMessage(
@@ -138,6 +194,15 @@ export function useChatSocketBridge() {
       "system",
       "System",
       `${formatDisplayName(payload.user_uuid)} entered the room.`,
+    );
+  });
+
+  useSocketEvent("LeaveRoom", (payload) => {
+    dispatch(
+      removeRoomMember({
+        roomId: activeRoomId || "general",
+        userId: payload.user_uuid,
+      }),
     );
   });
 

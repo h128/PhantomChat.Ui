@@ -1,5 +1,11 @@
 const USER_ID_KEY = "phantomchat_user_uuid";
 
+export function deriveDisplayNameFromUserId(userId: string): string {
+  if (!userId) return "Unknown";
+  const segments = userId.split("_");
+  return `User ${segments[1] || userId.substring(0, 5)}`;
+}
+
 /**
  * Gets or creates a persistent unique ID for this browser session.
  */
@@ -14,7 +20,5 @@ export function getPersistentUserId(): string {
 }
 
 export function getPersistentUserName(): string {
-  const userId = getPersistentUserId();
-  const segments = userId.split("_");
-  return `User ${segments[1] || "Anonymous"}`;
+  return deriveDisplayNameFromUserId(getPersistentUserId());
 }

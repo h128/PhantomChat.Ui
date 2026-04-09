@@ -20,11 +20,17 @@ export type CommandResponse = {
   [key: string]: unknown;
 };
 
+export type RoomMemberPayload = {
+  user_uuid: string;
+  avatar_id: number;
+  display_name: string;
+};
+
 export type RoomResponse = CommandResponse & {
   room_name: string;
   room_key: string;
   room_created: boolean;
-  members: string[];
+  members: RoomMemberPayload[];
   server_pub_key?: string;
 };
 
@@ -37,6 +43,13 @@ export type NewMessagePayload = {
 };
 
 export type UserEnteredPayload = {
+  user_uuid: string;
+  room_name: string;
+  avatar_id?: number;
+  display_name?: string;
+};
+
+export type LeaveRoomPayload = {
   user_uuid: string;
   room_name: string;
 };
@@ -66,10 +79,10 @@ export type SignalCallRelayPayload = {
 export type SocketEvent =
   | { event_name: "NewMessageReceived"; payload: NewMessagePayload }
   | { event_name: "UserEnteredRoom"; payload: UserEnteredPayload }
+  | { event_name: "LeaveRoom"; payload: LeaveRoomPayload }
   | { event_name: "FileUploaded"; payload: FileUploadedPayload }
   | { event_name: "SignalCallRelay"; payload: SignalCallRelayPayload }
-  | { event_name: "user_joined"; payload: unknown }
-  | { event_name: "room_created"; payload: RoomResponse }
+  | { event_name: "RoomCreated"; payload: RoomResponse }
   | { event_name: "balloon_received"; payload: unknown }
   | { event_name: "state_changed"; payload: SocketState };
 
