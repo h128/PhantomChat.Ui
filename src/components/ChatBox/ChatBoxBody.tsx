@@ -146,6 +146,21 @@ function ImageAttachment({
   );
 }
 
+async function downloadVoiceMessage(
+  roomName: string,
+  fileName: string,
+  roomKey: string,
+) {
+  const { decryptFile, isEncryptionEnabled } =
+    await import("../../services/crypto");
+  const { downloadFile } = await import("../../services/fileUpload");
+  const data = await downloadFile(roomName, fileName);
+  const decrypted = isEncryptionEnabled()
+    ? await decryptFile(data, roomKey)
+    : data;
+  return URL.createObjectURL(new Blob([new Uint8Array(decrypted)]));
+}
+
 function VoiceMessagePlayer({
   attachment,
   roomName,
@@ -197,20 +212,17 @@ function VoiceMessagePlayer({
     pendingPlayRef.current = true;
     setIsLoading(true);
     try {
-      const { decryptFile, isEncryptionEnabled } =
-        await import("../../services/crypto");
-      const { downloadFile } = await import("../../services/fileUpload");
-      const data = await downloadFile(roomName, attachment.fileName);
-      const decrypted = isEncryptionEnabled()
-        ? await decryptFile(data, roomKey)
-        : data;
-      const url = URL.createObjectURL(new Blob([new Uint8Array(decrypted)]));
+      const url = await downloadVoiceMessage(
+        roomName,
+        attachment.fileName,
+        roomKey,
+      );
       setAudioUrl(url);
+      setIsLoading(false);
     } catch (err) {
       console.error("Failed to load voice message:", err);
       toast.error("Failed to load voice message.");
       pendingPlayRef.current = false;
-    } finally {
       setIsLoading(false);
     }
   };
