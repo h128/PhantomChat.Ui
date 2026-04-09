@@ -1,10 +1,10 @@
 import clsx from "clsx";
 import EmojiPicker, { Theme, type EmojiClickData } from "emoji-picker-react";
-import { LogOut, Mic, Paperclip, Send, Smile, Trash2 } from "lucide-react";
+import { Mic, Paperclip, Send, Smile, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
+import type { FileAttachment } from "../../features/chat/chatSlice";
 import {
   addMessage,
   fileMessageReceived,
@@ -12,13 +12,10 @@ import {
   selectRoomKey,
   setRoomInfo,
 } from "../../features/chat/chatSlice";
-import type { FileAttachment } from "../../features/chat/chatSlice";
 import { selectProfile } from "../../features/profile/profileSlice";
 import { useSocketCommand } from "../../hooks/useSocket";
 import { useVoiceRecorder } from "../../hooks/useVoiceRecorder";
 import { encryptFile, isEncryptionEnabled } from "../../services/crypto";
-import type { CommandResponse } from "../../services/socket/types";
-import { generateUUID } from "../../utils/uuid";
 import {
   createThumbnail,
   generateFileName,
@@ -27,7 +24,9 @@ import {
   uploadFile,
 } from "../../services/fileUpload";
 import { SocketCommands } from "../../services/socket/SocketCommands";
+import type { CommandResponse } from "../../services/socket/types";
 import { getPersistentUserId } from "../../utils/user";
+import { generateUUID } from "../../utils/uuid";
 import { useChatBox } from "./ChatBoxContext";
 
 function formatDuration(ms: number): string {
@@ -94,7 +93,6 @@ export function ChatBoxFooter() {
   const pickerRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const activeRoomId = useAppSelector(selectActiveRoomId);
   const profile = useAppSelector(selectProfile);
@@ -426,19 +424,6 @@ export function ChatBoxFooter() {
             </>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => navigate("/")}
-          title="Exit Room"
-          className={clsx(
-            "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition",
-            isDark
-              ? "text-slate-500 hover:bg-rose-500/10 hover:text-rose-400"
-              : "text-slate-400 hover:bg-rose-50 hover:text-rose-500",
-          )}
-        >
-          <LogOut size={18} />
-        </button>
       </div>
     </div>
   );

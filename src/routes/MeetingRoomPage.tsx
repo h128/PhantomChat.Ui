@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import {
   ChevronDown,
+  LogOut,
   Mic,
   MicOff,
   Phone,
@@ -17,15 +18,25 @@ import { toast } from "sonner";
 import { useAppDispatch, useAppSelector } from "../app/hooks";
 import { ChatBox } from "../components/ChatBox";
 import { ThemeToggle } from "../components/ThemeToggle";
-import { setActiveRoom, setRoomInfo, setRoomMembers } from "../features/chat/chatSlice";
-import { selectIsProfileComplete, selectProfile } from "../features/profile/profileSlice";
+import {
+  setActiveRoom,
+  setRoomInfo,
+  setRoomMembers,
+} from "../features/chat/chatSlice";
+import {
+  selectIsProfileComplete,
+  selectProfile,
+} from "../features/profile/profileSlice";
 import { selectResolvedTheme } from "../features/theme/themeSlice";
 import { useSocketCommand, useSocketState } from "../hooks/useSocket";
 import { useWebRTC } from "../hooks/useWebRTC";
 import { decryptRoomKey, getPublicKeyHex } from "../services/crypto";
 import { SocketCommands } from "../services/socket/SocketCommands";
 import type { RoomResponse } from "../services/socket/types";
-import { deriveDisplayNameFromUserId, getPersistentUserId } from "../utils/user";
+import {
+  deriveDisplayNameFromUserId,
+  getPersistentUserId,
+} from "../utils/user";
 
 function normalizeMeetingName(value: string) {
   return value
@@ -424,6 +435,19 @@ export function MeetingRoomPage() {
                 </>
               )}
             <ThemeToggle />
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              title="Exit Room"
+              className={clsx(
+                "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition",
+                isDark
+                  ? "text-slate-500 hover:bg-rose-500/10 hover:text-rose-400"
+                  : "text-slate-400 hover:bg-rose-50 hover:text-rose-500",
+              )}
+            >
+              <LogOut size={18} />
+            </button>
           </div>
         </header>
 
