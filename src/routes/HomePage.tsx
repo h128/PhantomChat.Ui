@@ -144,70 +144,6 @@ export function HomePage() {
                 Start or join a room and jump straight into the conversation
               </h1>
               <form onSubmit={handleSubmit} className="mt-8 space-y-6">
-                <label
-                  htmlFor="room-name"
-                  className={clsx(
-                    "mb-3 block text-left text-sm font-medium",
-                    isDark ? "text-slate-400" : "text-slate-500",
-                  )}
-                >
-                  Room name
-                </label>
-
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <MeetingNameInput
-                    id="room-name"
-                    value={roomName}
-                    onChange={(event) => setRoomName(event.target.value)}
-                    placeholder="Enter a room name"
-                    aria-label="Meeting room name"
-                    autoComplete="off"
-                    autoCapitalize="off"
-                    spellCheck={false}
-                    className={clsx(
-                      isDark &&
-                        "border-slate-800 bg-slate-900/80 text-slate-100 placeholder:text-slate-500 focus:border-sky-400/60 focus:bg-slate-950 focus:ring-sky-400/10",
-                    )}
-                  />
-
-                  <MeetingActionButton
-                    type="submit"
-                    disabled={!canContinue}
-                    className={clsx(
-                      "sm:w-36",
-                      isDark
-                        ? "bg-sky-400 text-slate-950 shadow-[0_16px_40px_rgba(56,189,248,0.2)] hover:bg-sky-300 disabled:bg-slate-800 disabled:text-slate-500 disabled:shadow-none"
-                        : "bg-[#3390ec] text-white shadow-[0_16px_40px_rgba(51,144,236,0.24)] hover:bg-[#2b82d9] disabled:bg-[#dce9f6] disabled:text-[#8fa7be] disabled:shadow-none",
-                    )}
-                  >
-                    Continue
-                  </MeetingActionButton>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="display-name"
-                    className={clsx(
-                      "mb-3 block text-left text-sm font-medium",
-                      isDark ? "text-slate-400" : "text-slate-500",
-                    )}
-                  >
-                    Nickname
-                  </label>
-                  <MeetingNameInput
-                    id="display-name"
-                    value={displayName}
-                    onChange={(event) => setDisplayName(event.target.value)}
-                    maxLength={64}
-                    placeholder="Choose how people will see you"
-                    autoComplete="nickname"
-                    className={clsx(
-                      isDark &&
-                        "border-slate-800 bg-slate-900/80 text-slate-100 placeholder:text-slate-500 focus:border-sky-400/60 focus:bg-slate-950 focus:ring-sky-400/10",
-                    )}
-                  />
-                </div>
-
                 <div>
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="text-left">
@@ -228,12 +164,6 @@ export function HomePage() {
                         Pick one from the built-in avatar set
                       </p>
                     </div>
-                    <UserAvatar
-                      avatarId={selectedAvatarId}
-                      displayName={normalizedDisplayName}
-                      isDark={isDark}
-                      className="h-14 w-14 rounded-2xl"
-                    />
                   </div>
 
                   <AvatarPicker
@@ -241,6 +171,84 @@ export function HomePage() {
                     onSelect={setSelectedAvatarId}
                     isDark={isDark}
                   />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="display-name"
+                    className={clsx(
+                      "mb-3 block text-left text-sm font-medium",
+                      isDark ? "text-slate-400" : "text-slate-500",
+                    )}
+                  >
+                    Nickname
+                  </label>
+
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <MeetingNameInput
+                      id="display-name"
+                      value={displayName}
+                      onChange={(event) => setDisplayName(event.target.value)}
+                      maxLength={64}
+                      placeholder="Choose how people will see you"
+                      autoComplete="nickname"
+                      className={clsx(
+                        "flex-1",
+                        isDark &&
+                          "border-slate-800 bg-slate-900/80 text-slate-100 placeholder:text-slate-500 focus:border-sky-400/60 focus:bg-slate-950 focus:ring-sky-400/10",
+                      )}
+                    />
+
+                      <UserAvatar
+                        avatarId={selectedAvatarId}
+                        displayName={normalizedDisplayName}
+                        isDark={isDark}
+                        className="h-14 w-14 rounded-[1.1rem] sm:h-14 sm:w-14"
+                      />
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="room-name"
+                    className={clsx(
+                      "mb-3 block text-left text-sm font-medium",
+                      isDark ? "text-slate-400" : "text-slate-500",
+                    )}
+                  >
+                    Room name
+                  </label>
+
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <MeetingNameInput
+                      id="room-name"
+                      value={roomName}
+                      onChange={(event) => setRoomName(event.target.value)}
+                      placeholder="Enter a room name"
+                      aria-label="Meeting room name"
+                      autoComplete="off"
+                      autoCapitalize="off"
+                      spellCheck={false}
+                      className={clsx(
+                        "flex-1",
+                        isDark &&
+                          "border-slate-800 bg-slate-900/80 text-slate-100 placeholder:text-slate-500 focus:border-sky-400/60 focus:bg-slate-950 focus:ring-sky-400/10",
+                      )}
+                    />
+
+                    <MeetingActionButton
+                      type="submit"
+                      disabled={!canContinue}
+                      className={clsx(
+                        "sm:w-36",
+                        isDark
+                          ? "bg-sky-400 text-slate-950 shadow-[0_16px_40px_rgba(56,189,248,0.2)] hover:bg-sky-300 disabled:bg-slate-800 disabled:text-slate-500 disabled:shadow-none"
+                          : "bg-[#3390ec] text-white shadow-[0_16px_40px_rgba(51,144,236,0.24)] hover:bg-[#2b82d9] disabled:bg-[#dce9f6] disabled:text-[#8fa7be] disabled:shadow-none",
+                      )}
+                    >
+                      Continue
+                    </MeetingActionButton>
+                  </div>
                 </div>
               </form>
 
