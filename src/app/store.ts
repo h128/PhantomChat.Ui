@@ -12,12 +12,25 @@ export const store = configureStore({
   },
 });
 
+let previousStoredProfile = {
+  displayName: store.getState().profile.displayName,
+  avatarId: store.getState().profile.avatarId,
+};
+
 store.subscribe(() => {
   const profile = store.getState().profile;
-  saveStoredProfile({
+  const nextStoredProfile = {
     displayName: profile.displayName,
     avatarId: profile.avatarId,
-  });
+  };
+
+  if (
+    nextStoredProfile.displayName !== previousStoredProfile.displayName ||
+    nextStoredProfile.avatarId !== previousStoredProfile.avatarId
+  ) {
+    saveStoredProfile(nextStoredProfile);
+    previousStoredProfile = nextStoredProfile;
+  }
 });
 
 export type RootState = ReturnType<typeof store.getState>;
