@@ -51,6 +51,7 @@ export type UserEnteredPayload = {
 
 export type LeaveRoomPayload = {
   user_uuid: string;
+  room_name: string;
 };
 
 export type FileUploadedPayload = {
