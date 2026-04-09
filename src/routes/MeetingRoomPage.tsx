@@ -435,20 +435,20 @@ export function MeetingRoomPage() {
                   </button>
                 </>
               )}
-            <ThemeToggle />
             <button
               type="button"
               onClick={() => navigate("/")}
               title="Exit Room"
               className={clsx(
-                "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition",
+                "flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-all hover:scale-110 active:scale-95",
                 isDark
-                  ? "text-slate-500 hover:bg-rose-500/10 hover:text-rose-400"
-                  : "text-slate-400 hover:bg-rose-50 hover:text-rose-500",
+                  ? "bg-rose-500/10 text-rose-400 hover:bg-rose-500/20"
+                  : "bg-rose-100 text-rose-600 hover:bg-rose-200",
               )}
             >
               <LogOut size={18} />
             </button>
+            <ThemeToggle />
           </div>
         </header>
 
