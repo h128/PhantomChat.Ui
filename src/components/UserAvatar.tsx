@@ -19,11 +19,18 @@ export function UserAvatar({
 
   if (avatar) {
     return (
-      <img
-        src={avatar.src}
-        alt={displayName || avatar.label}
-        className={clsx("rounded-lg object-cover", className)}
-      />
+      <div
+        className={clsx(
+          "relative overflow-hidden rounded-lg bg-white/70",
+          className,
+        )}
+      >
+        <img
+          src={avatar.src}
+          alt={displayName || avatar.label}
+          className="h-full w-full scale-[1.08] object-cover object-center"
+        />
+      </div>
     );
   }
 

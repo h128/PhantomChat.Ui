@@ -1,4 +1,5 @@
 import clsx from "clsx";
+import { UserAvatar } from "../components/UserAvatar";
 import { avatarCatalog } from "../features/profile/avatarCatalog";
 
 interface AvatarPickerProps {
@@ -23,7 +24,7 @@ export function AvatarPicker({
             type="button"
             onClick={() => onSelect(avatar.id)}
             className={clsx(
-              "group rounded-2xl border p-2.5 text-center transition focus:outline-none focus:ring-4",
+              "group aspect-square rounded-2xl border p-1.5 text-center transition focus:outline-none focus:ring-4",
               isSelected
                 ? isDark
                   ? "border-sky-400/60 bg-sky-400/10 ring-sky-400/20"
@@ -34,19 +35,12 @@ export function AvatarPicker({
             )}
             aria-pressed={isSelected}
           >
-            <img
-              src={avatar.src}
-              alt={avatar.label}
-              className="mx-auto h-16 w-16 rounded-2xl"
+            <UserAvatar
+              avatarId={avatar.id}
+              displayName={avatar.label}
+              isDark={isDark}
+              className="h-full w-full rounded-[1.05rem]"
             />
-            {/* <span
-              className={clsx(
-                "mt-2 block text-xs font-medium",
-                isDark ? "text-slate-300" : "text-slate-600",
-              )}
-            >
-              {avatar.label}
-            </span> */}
           </button>
         );
       })}
