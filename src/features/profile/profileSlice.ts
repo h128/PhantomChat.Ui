@@ -39,8 +39,11 @@ export const { setProfile } = profileSlice.actions;
 
 export const selectProfile = (state: RootState) => state.profile;
 
-export const selectIsProfileComplete = createSelector([selectProfile], (profile) => {
-  return Boolean(profile.displayName.trim()) && profile.avatarId !== null;
-});
+export const selectIsProfileComplete = createSelector(
+  [selectProfile],
+  (profile) => {
+    return Boolean(profile.displayName.trim()) && profile.avatarId !== null;
+  },
+);
 
 export default profileSlice.reducer;

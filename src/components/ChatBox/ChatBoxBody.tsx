@@ -14,7 +14,10 @@ import { selectProfile } from "../../features/profile/profileSlice";
 import type { FileAttachment } from "../../features/chat/chatSlice";
 import { decryptFile, isEncryptionEnabled } from "../../services/crypto";
 import { downloadFile } from "../../services/fileUpload";
-import { deriveDisplayNameFromUserId, getPersistentUserId } from "../../utils/user";
+import {
+  deriveDisplayNameFromUserId,
+  getPersistentUserId,
+} from "../../utils/user";
 import { useChatBox } from "./ChatBoxContext";
 
 function formatTime(isoString: string) {
@@ -424,10 +427,12 @@ export function ChatBoxBody() {
         const roomMember = roomMembers[msg.senderId];
         const resolvedDisplayName = isOwn
           ? profile.displayName || roomMember?.displayName || msg.senderName
-          : roomMember?.displayName || msg.senderName || deriveDisplayNameFromUserId(msg.senderId);
+          : roomMember?.displayName ||
+            msg.senderName ||
+            deriveDisplayNameFromUserId(msg.senderId);
         const resolvedAvatarId = isOwn
-          ? profile.avatarId ?? roomMember?.avatarId ?? null
-          : roomMember?.avatarId ?? null;
+          ? (profile.avatarId ?? roomMember?.avatarId ?? null)
+          : (roomMember?.avatarId ?? null);
 
         return (
           <div

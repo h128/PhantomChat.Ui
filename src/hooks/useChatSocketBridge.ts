@@ -9,7 +9,10 @@ import {
 } from "../features/chat/chatSlice";
 import type { RoomMember } from "../features/chat/chatSlice";
 import { useSocketEvent } from "./useSocket";
-import { deriveDisplayNameFromUserId, getPersistentUserId } from "../utils/user";
+import {
+  deriveDisplayNameFromUserId,
+  getPersistentUserId,
+} from "../utils/user";
 import { generateUUID } from "../utils/uuid";
 import type { ChatMessage } from "../features/chat/chatSlice";
 import type {
@@ -61,7 +64,8 @@ function toRoomMember(
   return {
     userId: payload.user_uuid,
     displayName:
-      payload.display_name?.trim() || deriveDisplayNameFromUserId(payload.user_uuid),
+      payload.display_name?.trim() ||
+      deriveDisplayNameFromUserId(payload.user_uuid),
     avatarId: typeof payload.avatar_id === "number" ? payload.avatar_id : null,
   };
 }
