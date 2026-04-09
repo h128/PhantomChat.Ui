@@ -17,6 +17,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useAppDispatch, useAppSelector } from "../app/hooks";
 import { ChatBox } from "../components/ChatBox";
+import { InviteOthers } from "../components/InviteOthers";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { UsersListPanel } from "../components/usersList/usersListPanel";
 import {
@@ -66,7 +67,7 @@ async function joinRoom(
   profile: { displayName: string; avatarId: number | null },
   hasJoinedRef: React.MutableRefObject<boolean>,
   retryOnConflict = true,
-): Promise<void> {
+): Promise<boolean> {
   try {
     const publicKey = await getPublicKeyHex();
 
@@ -115,6 +116,7 @@ async function joinRoom(
       console.log(
         `[MeetingRoom] Successfully initialized and joined: ${normalizedRoomName}`,
       );
+      return response.room_created;
     } else if (
       retryOnConflict &&
       message.toLowerCase().includes("already in another room")
@@ -149,6 +151,7 @@ async function joinRoom(
     toast.error("Failed to initialize room. Please try again.");
     hasJoinedRef.current = false;
   }
+  return false;
 }
 
 const RemoteVideo = ({
@@ -242,6 +245,7 @@ export function MeetingRoomPage() {
   } = useWebRTC();
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [availableDevices, setAvailableDevices] = useState<{
     audioInputs: MediaDeviceInfo[];
     videoInputs: MediaDeviceInfo[];
@@ -302,7 +306,9 @@ export function MeetingRoomPage() {
         avatarId: profile.avatarId,
       },
       hasJoinedRef,
-    );
+    ).then((created) => {
+      if (created) setIsInviteOpen(true);
+    });
   }, [
     normalizedRoomName,
     displayRoomName,
@@ -752,6 +758,14 @@ export function MeetingRoomPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Invite Others Popup */}
+      {isInviteOpen && chatState.roomStatus === "joined" && (
+        <InviteOthers
+          roomName={normalizedRoomName}
+          onClose={() => setIsInviteOpen(false)}
+        />
       )}
     </div>
   );
