@@ -2,7 +2,7 @@ import { createSlice } from "@reduxjs/toolkit";
 import type { UiSliceState } from "./types";
 
 const initialState: UiSliceState = {
-  usersListIsOpen: true,
+  usersListIsOpen: false,
 };
 
 const slice = createSlice({
