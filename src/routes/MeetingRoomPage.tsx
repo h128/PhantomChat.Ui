@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { useAppDispatch, useAppSelector } from "../app/hooks";
 import { ChatBox } from "../components/ChatBox";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { UsersListPanel } from "../components/usersList/usersListPanel";
 import {
   setActiveRoom,
   setRoomInfo,
@@ -451,12 +452,15 @@ export function MeetingRoomPage() {
           </div>
         </header>
 
-        <main className="mt-5 flex min-h-0 flex-1 flex-col">
-          <ChatBox>
-            <ChatBox.Title />
-            <ChatBox.Body />
-            <ChatBox.Footer />
-          </ChatBox>
+        <main className="mt-5 flex min-h-0 flex-1 flex-row">
+          <UsersListPanel />
+          <div className="flex flex-col grow">
+            <ChatBox>
+              <ChatBox.Title />
+              <ChatBox.Body />
+              <ChatBox.Footer />
+            </ChatBox>
+          </div>
         </main>
       </div>
 

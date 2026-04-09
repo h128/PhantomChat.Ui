@@ -1,14 +1,28 @@
 import clsx from "clsx";
 import { Users } from "lucide-react";
-import { useAppSelector } from "../../app/hooks";
+import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { selectActiveRoom } from "../../features/chat/chatSlice";
 import { useChatBox } from "./ChatBoxContext";
+import { isMobile } from "../../utils/isMobile";
+import { uiSlice } from "../../features/ui/uiSlice";
+import { selectIsUsersListOpen } from "../../features/ui/selectors";
 
 export function ChatBoxTitle() {
   const { isDark } = useChatBox();
   const activeRoom = useAppSelector(selectActiveRoom);
 
+  const dispatch = useAppDispatch();
+
+  const usersListOpen = useAppSelector(selectIsUsersListOpen);
+
   if (!activeRoom) return null;
+
+  const isMobileDevice = isMobile();
+
+  const toggleUserList = () => {
+    if (isMobileDevice) return;
+    dispatch(uiSlice.actions.toggle());
+  };
 
   return (
     <div
@@ -47,7 +61,11 @@ export function ChatBoxTitle() {
         className={clsx(
           "ml-4 flex shrink-0 items-center gap-1.5 text-xs font-medium",
           isDark ? "text-slate-400" : "text-slate-500",
+          !isMobileDevice && isDark && "cursor-pointer hover:text-white",
+          !isMobileDevice && !isDark && "cursor-pointer hover:text-slate-900",
+          usersListOpen && (isDark ? "text-white" : "text-slate-900"),
         )}
+        onClick={toggleUserList}
       >
         <Users size={14} />
         {activeRoom.members}

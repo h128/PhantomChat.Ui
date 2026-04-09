@@ -1,12 +1,12 @@
 import clsx from "clsx";
 import { getAvatarById } from "../features/profile/avatarCatalog";
 
-interface UserAvatarProps {
+type UserAvatarProps = {
   avatarId?: number | null;
   displayName?: string;
   isDark: boolean;
   className?: string;
-}
+};
 
 export function UserAvatar({
   avatarId,
@@ -38,7 +38,9 @@ export function UserAvatar({
     <div
       className={clsx(
         "flex items-center justify-center rounded-lg text-sm font-semibold",
-        isDark ? "bg-sky-400/15 text-sky-300" : "bg-[#3390ec]/10 text-[#3390ec]",
+        isDark
+          ? "bg-sky-400/15 text-sky-300"
+          : "bg-[#3390ec]/10 text-[#3390ec]",
         className,
       )}
     >
