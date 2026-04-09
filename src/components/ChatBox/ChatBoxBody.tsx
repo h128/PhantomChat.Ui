@@ -437,6 +437,7 @@ export function ChatBoxBody() {
             <div
               className={clsx(
                 "flex max-w-[75%] gap-3 rounded-2xl px-3.5 py-2.5",
+                isOwn && "flex-row-reverse",
                 isOwn
                   ? isDark
                     ? "bg-sky-400/15"
@@ -446,14 +447,12 @@ export function ChatBoxBody() {
                     : "bg-slate-100/80",
               )}
             >
-              {!isOwn && (
-                <UserAvatar
-                  avatarId={resolvedAvatarId}
-                  displayName={resolvedDisplayName}
-                  isDark={isDark}
-                  className="mt-0.5 h-9 w-9 shrink-0"
-                />
-              )}
+              <UserAvatar
+                avatarId={resolvedAvatarId}
+                displayName={resolvedDisplayName}
+                isDark={isDark}
+                className="mt-0.5 h-9 w-9 shrink-0"
+              />
               <div className="min-w-0">
                 <div
                   className={clsx(

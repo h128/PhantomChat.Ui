@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import { type FormEvent, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 import { useAppDispatch, useAppSelector } from "../app/hooks";
 import { AvatarPicker } from "../components/AvatarPicker";
 import { MeetingActionButton } from "../components/MeetingActionButton";
@@ -44,7 +45,18 @@ export function HomePage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!canContinue || selectedAvatarId === null) {
+    if (!normalizedRoomName) {
+      toast.error("Enter a room name to continue.");
+      return;
+    }
+
+    if (!normalizedDisplayName) {
+      toast.error("Choose a nickname to continue.");
+      return;
+    }
+
+    if (selectedAvatarId === null) {
+      toast.error("Select an avatar to continue.");
       return;
     }
 
@@ -199,12 +211,12 @@ export function HomePage() {
                       )}
                     />
 
-                      <UserAvatar
-                        avatarId={selectedAvatarId}
-                        displayName={normalizedDisplayName}
-                        isDark={isDark}
-                        className="h-14 w-14 rounded-[1.1rem] sm:h-14 sm:w-14"
-                      />
+                    <UserAvatar
+                      avatarId={selectedAvatarId}
+                      displayName={normalizedDisplayName}
+                      isDark={isDark}
+                      className="h-14 w-14 rounded-[1.1rem] sm:h-14 sm:w-14"
+                    />
                   </div>
                 </div>
 

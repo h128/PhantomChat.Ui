@@ -24,16 +24,37 @@ type BridgeMessageOptions = {
   getTimestamp?: () => string;
 };
 
+type BackendRoomMemberPayload = {
+  user_uuid: string;
+  display_name?: string;
+  avatar_id?: number;
+};
+
+type NormalizedRoomMemberPayload = {
+  userId: string;
+  displayName: string;
+  avatarId: number | null;
+};
+
 export function formatDisplayName(uuid: string) {
   return deriveDisplayNameFromUserId(uuid);
 }
 
+function isNormalizedRoomMember(
+  payload: BackendRoomMemberPayload | NormalizedRoomMemberPayload,
+): payload is NormalizedRoomMemberPayload {
+  return (
+    "userId" in payload &&
+    typeof payload.userId === "string" &&
+    typeof payload.displayName === "string" &&
+    (typeof payload.avatarId === "number" || payload.avatarId === null)
+  );
+}
+
 function toRoomMember(
-  payload:
-    | { user_uuid: string; display_name?: string; avatar_id?: number }
-    | { userId: string; displayName: string; avatarId: number | null },
+  payload: BackendRoomMemberPayload | NormalizedRoomMemberPayload,
 ): RoomMember {
-  if ("userId" in payload) {
+  if (isNormalizedRoomMember(payload)) {
     return payload;
   }
 

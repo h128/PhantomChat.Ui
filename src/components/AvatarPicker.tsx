@@ -1,6 +1,6 @@
 import clsx from "clsx";
 import { UserAvatar } from "../components/UserAvatar";
-import { avatarCatalog } from "../features/profile/avatarCatalog";
+import { AvatarCatalog } from "../features/profile/avatarCatalog";
 
 interface AvatarPickerProps {
   selectedAvatarId: number | null;
@@ -15,7 +15,7 @@ export function AvatarPicker({
 }: AvatarPickerProps) {
   return (
     <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-      {avatarCatalog.map((avatar) => {
+      {AvatarCatalog.map((avatar) => {
         const isSelected = avatar.id === selectedAvatarId;
 
         return (

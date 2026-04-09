@@ -5,14 +5,14 @@ import avatar04 from "../../assets/avatars/avatar-04.svg";
 import avatar05 from "../../assets/avatars/avatar-05.svg";
 import avatar06 from "../../assets/avatars/avatar-06.svg";
 
-export interface AvatarDefinition {
+export type AvatarDefinition = {
   id: number;
   label: string;
   src: string;
   group: "classic" | "bright" | "soft" | "warm";
-}
+};
 
-export const avatarCatalog: AvatarDefinition[] = [
+export const AvatarCatalog: AvatarDefinition[] = [
   { id: 1, label: "Skylark", src: avatar01, group: "classic" },
   { id: 2, label: "Maple", src: avatar02, group: "warm" },
   { id: 3, label: "Juniper", src: avatar03, group: "soft" },
@@ -26,5 +26,5 @@ export function getAvatarById(avatarId: number | null | undefined) {
     return null;
   }
 
-  return avatarCatalog.find((avatar) => avatar.id === avatarId) ?? null;
+  return AvatarCatalog.find((avatar) => avatar.id === avatarId) ?? null;
 }

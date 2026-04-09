@@ -10,14 +10,14 @@ export interface Room {
   topic: string;
   members: number;
   unread: number;
-}
+};
 
 export interface FileAttachment {
   fileName: string;
   originalName: string;
   type: "image" | "file" | "audio";
   thumbnailFile?: string;
-}
+};
 
 export interface ChatMessage {
   id: string;
@@ -26,7 +26,7 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
   attachment?: FileAttachment;
-}
+};
 
 export interface CallState {
   status: "idle" | "calling" | "incoming" | "connected";
@@ -38,13 +38,13 @@ export interface CallState {
   selectedMicrophoneId: string | null;
   selectedCameraId: string | null;
   offer?: RTCSessionDescriptionInit;
-}
+};
 
-export interface RoomMember {
+export type RoomMember = {
   userId: string;
   displayName: string;
   avatarId: number | null;
-}
+};
 
 interface ChatState {
   presenceMode: PresenceMode;
@@ -55,7 +55,7 @@ interface ChatState {
   roomKey: string | null;
   roomStatus: "idle" | "joining" | "joined" | "error";
   callState: CallState;
-}
+};
 
 const presenceOrder: PresenceMode[] = ["focused", "available", "quiet"];
 

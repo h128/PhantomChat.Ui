@@ -1,13 +1,17 @@
-import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
+import {
+  createSelector,
+  createSlice,
+  type PayloadAction,
+} from "@reduxjs/toolkit";
 import type { RootState } from "../../app/store";
 import { getPersistentUserId } from "../../utils/user";
 import { loadStoredProfile } from "./profileStorage";
 
-export interface ProfileState {
+export type ProfileState = {
   userId: string;
   displayName: string;
   avatarId: number | null;
-}
+};
 
 const storedProfile = loadStoredProfile();
 
@@ -35,7 +39,8 @@ export const { setProfile } = profileSlice.actions;
 
 export const selectProfile = (state: RootState) => state.profile;
 
-export const selectIsProfileComplete = (state: RootState) =>
-  Boolean(state.profile.displayName.trim()) && state.profile.avatarId !== null;
+export const selectIsProfileComplete = createSelector([selectProfile], (profile) => {
+  return Boolean(profile.displayName.trim()) && profile.avatarId !== null;
+});
 
 export default profileSlice.reducer;

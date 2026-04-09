@@ -1,9 +1,9 @@
 export const PROFILE_STORAGE_KEY = "phantomchat_profile";
 
-export interface StoredProfile {
+export type StoredProfile = {
   displayName: string;
   avatarId: number | null;
-}
+};
 
 export function loadStoredProfile(): StoredProfile {
   if (typeof localStorage === "undefined") {
