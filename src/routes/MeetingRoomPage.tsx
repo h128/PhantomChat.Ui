@@ -12,19 +12,20 @@ import {
   VideoOff,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useAppDispatch, useAppSelector } from "../app/hooks";
 import { ChatBox } from "../components/ChatBox";
 import { ThemeToggle } from "../components/ThemeToggle";
-import { setActiveRoom, setRoomInfo } from "../features/chat/chatSlice";
+import { setActiveRoom, setRoomInfo, setRoomMembers } from "../features/chat/chatSlice";
+import { selectIsProfileComplete, selectProfile } from "../features/profile/profileSlice";
 import { selectResolvedTheme } from "../features/theme/themeSlice";
 import { useSocketCommand, useSocketState } from "../hooks/useSocket";
 import { useWebRTC } from "../hooks/useWebRTC";
 import { decryptRoomKey, getPublicKeyHex } from "../services/crypto";
 import { SocketCommands } from "../services/socket/SocketCommands";
-import type { CommandResponse } from "../services/socket/types";
-import { getPersistentUserId } from "../utils/user";
+import type { RoomResponse } from "../services/socket/types";
+import { deriveDisplayNameFromUserId, getPersistentUserId } from "../utils/user";
 
 function normalizeMeetingName(value: string) {
   return value
@@ -50,17 +51,20 @@ async function joinRoom(
   dispatch: Dispatch,
   normalizedRoomName: string,
   displayRoomName: string,
+  profile: { displayName: string; avatarId: number | null },
   hasJoinedRef: React.MutableRefObject<boolean>,
   retryOnConflict = true,
 ): Promise<void> {
   try {
     const publicKey = await getPublicKeyHex();
 
-    const response = (await sendCommand(SocketCommands.CREATE_ROOM, {
+    const response = (await sendCommand(SocketCommands.JOIN_OR_CREATE_ROOM, {
       user_uuid: getPersistentUserId(),
       room_name: normalizedRoomName,
       public_key: publicKey,
-    })) as CommandResponse;
+      avatar_id: profile.avatarId,
+      display_name: profile.displayName,
+    })) as RoomResponse;
 
     const status = response.status;
     const message = response.message ?? "";
@@ -79,13 +83,21 @@ async function joinRoom(
     }
 
     if (status === 0) {
-      dispatch(setRoomInfo({ key: roomKey, status: "joined" }));
+      dispatch(
+        setRoomMembers({
+          roomId: normalizedRoomName,
+          members: response.members.map((member) => ({
+            userId: member.user_uuid,
+            displayName:
+              member.display_name?.trim() ||
+              deriveDisplayNameFromUserId(member.user_uuid),
+            avatarId:
+              typeof member.avatar_id === "number" ? member.avatar_id : null,
+          })),
+        }),
+      );
 
-      await sendCommand(SocketCommands.JOIN_OR_MESSAGE, {
-        user_uuid: getPersistentUserId(),
-        room_name: normalizedRoomName,
-        message: "__JOIN__",
-      });
+      dispatch(setRoomInfo({ key: roomKey, status: "joined" }));
 
       toast.success(`Joined ${displayRoomName}`);
       console.log(
@@ -108,6 +120,7 @@ async function joinRoom(
         dispatch,
         normalizedRoomName,
         displayRoomName,
+        profile,
         hasJoinedRef,
         false,
       );
@@ -194,8 +207,11 @@ const RemoteVideo = ({
 
 export function MeetingRoomPage() {
   const { roomName = "" } = useParams();
+  const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const resolvedTheme = useAppSelector(selectResolvedTheme);
+  const profile = useAppSelector(selectProfile);
+  const isProfileComplete = useAppSelector(selectIsProfileComplete);
   const sendCommand = useSocketCommand();
   const socketState = useSocketState(); // Track connection state
   const chatState = useAppSelector((state) => state.chat);
@@ -237,10 +253,22 @@ export function MeetingRoomPage() {
     sendCommandRef.current = sendCommand;
   }, [sendCommand]);
 
+  useEffect(() => {
+    if (!normalizedRoomName || isProfileComplete) {
+      return;
+    }
+
+    toast.error("Choose a nickname and avatar before joining a room.");
+    navigate(`/?room=${encodeURIComponent(normalizedRoomName)}`, {
+      replace: true,
+    });
+  }, [isProfileComplete, navigate, normalizedRoomName]);
+
   // 1. Immediate sync of activeRoomId and Join Room
   useEffect(() => {
     if (
       !normalizedRoomName ||
+      !isProfileComplete ||
       socketState !== "connected" ||
       hasJoinedRef.current ||
       chatState.roomStatus === "joined" ||
@@ -257,12 +285,19 @@ export function MeetingRoomPage() {
       dispatch,
       normalizedRoomName,
       displayRoomName,
+      {
+        displayName: profile.displayName.trim(),
+        avatarId: profile.avatarId,
+      },
       hasJoinedRef,
     );
   }, [
     normalizedRoomName,
     displayRoomName,
     dispatch,
+    isProfileComplete,
+    profile.avatarId,
+    profile.displayName,
     socketState,
     chatState.roomStatus,
     chatState.activeRoomId,
@@ -474,8 +509,7 @@ export function MeetingRoomPage() {
                   </div>
                 </div>
               </div>
-            )}{" "}
-            function
+            )}
             {callState.status === "calling" &&
               callState.callType === "video" && (
                 <div className="mb-8 flex w-full justify-center">

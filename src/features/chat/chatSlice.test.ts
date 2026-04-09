@@ -3,12 +3,12 @@ import themeReducer from "../theme/themeSlice";
 import chatReducer, {
   addMessage,
   cyclePresenceMode,
-  markRoomRead,
   messageReceived,
   selectActiveRoom,
   selectActiveRoomMessages,
   selectActiveRoomId,
   setActiveRoom,
+  setRoomMembers,
   setRoomInfo,
 } from "./chatSlice";
 import type { RootState } from "../../app/store";
@@ -21,6 +21,11 @@ vi.mock("../../utils/user", () => ({
 function createRootState(chatState: ReturnType<typeof chatReducer>): RootState {
   return {
     chat: chatState,
+    profile: {
+      userId: "user_test_123",
+      displayName: "User test",
+      avatarId: 1,
+    },
     theme: themeReducer(undefined, { type: "theme/init" }),
   } as RootState;
 }
@@ -48,17 +53,35 @@ describe("chatSlice", () => {
     expect(state.presenceMode).toBe("focused");
   });
 
-  it("marks only the requested room as read", () => {
+  it("stores room members and keeps a usable room summary", () => {
     const initialState = chatReducer(undefined, { type: "chat/init" });
 
-    const nextState = chatReducer(initialState, markRoomRead("signal-lab"));
+    const nextState = chatReducer(
+      initialState,
+      setRoomMembers({
+        roomId: "signal-lab",
+        members: [
+          {
+            userId: "user_test_123",
+            displayName: "User test",
+            avatarId: 1,
+          },
+          {
+            userId: "user_2",
+            displayName: "User 2",
+            avatarId: 2,
+          },
+        ],
+      }),
+    );
 
+    expect(nextState.membersByRoom["signal-lab"]["user_2"]).toMatchObject({
+      displayName: "User 2",
+      avatarId: 2,
+    });
     expect(
-      nextState.rooms.find((room) => room.id === "signal-lab")?.unread,
-    ).toBe(0);
-    expect(
-      nextState.rooms.find((room) => room.id === "launch-pad")?.unread,
-    ).toBe(7);
+      nextState.rooms.find((room) => room.id === "signal-lab")?.members,
+    ).toBe(2);
   });
 
   it("stores room join metadata", () => {
@@ -76,7 +99,11 @@ describe("chatSlice", () => {
   it("creates optimistic messages with prepared sender metadata", () => {
     const initialState = chatReducer(undefined, { type: "chat/init" });
 
-    const action = addMessage({ roomId: "launch-pad", content: "Hello team" });
+    const action = addMessage({
+      roomId: "launch-pad",
+      content: "Hello team",
+      senderName: "User test",
+    });
     const nextState = chatReducer(initialState, action);
 
     expect(nextState.messages["launch-pad"]).toHaveLength(1);
@@ -122,6 +149,19 @@ describe("chatSlice", () => {
     state = chatReducer(state, setActiveRoom("signal-lab"));
     state = chatReducer(
       state,
+      setRoomMembers({
+        roomId: "signal-lab",
+        members: [
+          {
+            userId: "user_2",
+            displayName: "User 2",
+            avatarId: 2,
+          },
+        ],
+      }),
+    );
+    state = chatReducer(
+      state,
       messageReceived({
         roomId: "signal-lab",
         message: {
@@ -138,6 +178,7 @@ describe("chatSlice", () => {
 
     expect(selectActiveRoomId(rootState)).toBe("signal-lab");
     expect(selectActiveRoom(rootState)?.name).toBe("Signal Lab");
+    expect(selectActiveRoom(rootState)?.members).toBe(1);
     expect(selectActiveRoomMessages(rootState)).toEqual([
       {
         id: "msg-2",

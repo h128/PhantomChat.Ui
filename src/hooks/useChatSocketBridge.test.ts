@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatDisplayName,
   mapNewMessagePayloadToAction,
+  mapRoomMembers,
   mapUserEnteredPayloadToAction,
 } from "./useChatSocketBridge";
 
@@ -103,6 +104,7 @@ describe("useChatSocketBridge helpers", () => {
       {
         user_uuid: "user_delta_001",
         room_name: "launch-pad",
+        display_name: "Delta",
       },
       "signal-lab",
       "user_self_999",
@@ -117,7 +119,7 @@ describe("useChatSocketBridge helpers", () => {
           id: "message-1",
           senderId: "system",
           senderName: "System",
-          content: "User delta entered the room.",
+          content: "Delta entered the room.",
           timestamp: "2026-04-02T10:30:00.000Z",
         },
       },
@@ -136,5 +138,36 @@ describe("useChatSocketBridge helpers", () => {
     );
 
     expect(action).toBeNull();
+  });
+
+  it("maps backend room members into normalized chat members", () => {
+    const action = mapRoomMembers("launch-pad", {
+      request_uuid: "request-1",
+      status: 0,
+      room_name: "launch-pad",
+      room_key: "encrypted-key",
+      room_created: false,
+      members: [
+        {
+          user_uuid: "user_alpha_123",
+          avatar_id: 2,
+          display_name: "Alpha",
+        },
+      ],
+    });
+
+    expect(action).toMatchObject({
+      type: "chat/setRoomMembers",
+      payload: {
+        roomId: "launch-pad",
+        members: [
+          {
+            userId: "user_alpha_123",
+            avatarId: 2,
+            displayName: "Alpha",
+          },
+        ],
+      },
+    });
   });
 });
