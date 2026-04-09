@@ -46,8 +46,9 @@ async function processFileUpload(
   const ext = getExtension(file.name);
 
   if (isImageFile(file)) {
-    const thumbnailFileName = generateFileName(userId, ext, false);
-    const originalFileName = generateFileName(userId, ext, true);
+    const random = Math.random().toString(36).substring(2, 8);
+    const thumbnailFileName = generateFileName(userId, ext, false, random);
+    const originalFileName = generateFileName(userId, ext, true, random);
 
     const thumbnailBytes = await createThumbnail(file);
     const originalBytes = new Uint8Array(await file.arrayBuffer());
