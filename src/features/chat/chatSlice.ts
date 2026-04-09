@@ -177,7 +177,7 @@ const chatSlice = createSlice({
           state.messages[roomId] = [];
         }
         state.messages[roomId].push(message);
-          syncRoomSummary(state, roomId);
+        syncRoomSummary(state, roomId);
       },
       prepare(payload: {
         roomId: string;
