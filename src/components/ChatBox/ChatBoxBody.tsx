@@ -14,7 +14,10 @@ import { selectProfile } from "../../features/profile/profileSlice";
 import type { FileAttachment } from "../../features/chat/chatSlice";
 import { decryptFile, isEncryptionEnabled } from "../../services/crypto";
 import { downloadFile } from "../../services/fileUpload";
-import { deriveDisplayNameFromUserId, getPersistentUserId } from "../../utils/user";
+import {
+  deriveDisplayNameFromUserId,
+  getPersistentUserId,
+} from "../../utils/user";
 import { useChatBox } from "./ChatBoxContext";
 
 function formatTime(isoString: string) {
@@ -143,6 +146,21 @@ function ImageAttachment({
   );
 }
 
+async function downloadVoiceMessage(
+  roomName: string,
+  fileName: string,
+  roomKey: string,
+) {
+  const { decryptFile, isEncryptionEnabled } =
+    await import("../../services/crypto");
+  const { downloadFile } = await import("../../services/fileUpload");
+  const data = await downloadFile(roomName, fileName);
+  const decrypted = isEncryptionEnabled()
+    ? await decryptFile(data, roomKey)
+    : data;
+  return URL.createObjectURL(new Blob([new Uint8Array(decrypted)]));
+}
+
 function VoiceMessagePlayer({
   attachment,
   roomName,
@@ -194,20 +212,17 @@ function VoiceMessagePlayer({
     pendingPlayRef.current = true;
     setIsLoading(true);
     try {
-      const { decryptFile, isEncryptionEnabled } =
-        await import("../../services/crypto");
-      const { downloadFile } = await import("../../services/fileUpload");
-      const data = await downloadFile(roomName, attachment.fileName);
-      const decrypted = isEncryptionEnabled()
-        ? await decryptFile(data, roomKey)
-        : data;
-      const url = URL.createObjectURL(new Blob([new Uint8Array(decrypted)]));
+      const url = await downloadVoiceMessage(
+        roomName,
+        attachment.fileName,
+        roomKey,
+      );
       setAudioUrl(url);
+      setIsLoading(false);
     } catch (err) {
       console.error("Failed to load voice message:", err);
       toast.error("Failed to load voice message.");
       pendingPlayRef.current = false;
-    } finally {
       setIsLoading(false);
     }
   };
@@ -424,10 +439,12 @@ export function ChatBoxBody() {
         const roomMember = roomMembers[msg.senderId];
         const resolvedDisplayName = isOwn
           ? profile.displayName || roomMember?.displayName || msg.senderName
-          : roomMember?.displayName || msg.senderName || deriveDisplayNameFromUserId(msg.senderId);
+          : roomMember?.displayName ||
+            msg.senderName ||
+            deriveDisplayNameFromUserId(msg.senderId);
         const resolvedAvatarId = isOwn
-          ? profile.avatarId ?? roomMember?.avatarId ?? null
-          : roomMember?.avatarId ?? null;
+          ? (profile.avatarId ?? roomMember?.avatarId ?? null)
+          : (roomMember?.avatarId ?? null);
 
         return (
           <div

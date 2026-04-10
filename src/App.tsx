@@ -1,23 +1,45 @@
+import { Suspense, lazy } from "react";
 import { RouterProvider, createBrowserRouter } from "react-router-dom";
 import { Toaster } from "sonner";
-import { HomePage } from "./routes/HomePage";
-import { MeetingRoomPage } from "./routes/MeetingRoomPage";
-import { NotFoundPage } from "./routes/NotFoundPage";
 import { SocketProvider } from "./context/SocketContext";
 import { useChatSocketBridge } from "./hooks/useChatSocketBridge";
+
+const HomePage = lazy(() =>
+  import("./routes/HomePage").then((m) => ({ default: m.HomePage })),
+);
+const MeetingRoomPage = lazy(() =>
+  import("./routes/MeetingRoomPage").then((m) => ({
+    default: m.MeetingRoomPage,
+  })),
+);
+const NotFoundPage = lazy(() =>
+  import("./routes/NotFoundPage").then((m) => ({ default: m.NotFoundPage })),
+);
 
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <HomePage />,
+    element: (
+      <Suspense>
+        <HomePage />
+      </Suspense>
+    ),
   },
   {
     path: "/room/:roomName",
-    element: <MeetingRoomPage />,
+    element: (
+      <Suspense>
+        <MeetingRoomPage />
+      </Suspense>
+    ),
   },
   {
     path: "*",
-    element: <NotFoundPage />,
+    element: (
+      <Suspense>
+        <NotFoundPage />
+      </Suspense>
+    ),
   },
 ]);
 

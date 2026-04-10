@@ -3,6 +3,7 @@ import chatReducer from "../features/chat/chatSlice";
 import profileReducer, { setProfile } from "../features/profile/profileSlice";
 import { saveStoredProfile } from "../features/profile/profileStorage";
 import themeReducer from "../features/theme/themeSlice";
+import { uiSlice } from "../features/ui/uiSlice";
 
 const profilePersistenceMiddleware = createListenerMiddleware<{
   profile: ReturnType<typeof profileReducer>;
@@ -21,6 +22,7 @@ export const store = configureStore({
     chat: chatReducer,
     profile: profileReducer,
     theme: themeReducer,
+    ui: uiSlice.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().prepend(profilePersistenceMiddleware.middleware),

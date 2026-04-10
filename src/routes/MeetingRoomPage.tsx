@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import {
   ChevronDown,
+  LogOut,
   Mic,
   MicOff,
   Phone,
@@ -16,16 +17,28 @@ import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useAppDispatch, useAppSelector } from "../app/hooks";
 import { ChatBox } from "../components/ChatBox";
+import { InviteOthers } from "../components/InviteOthers";
 import { ThemeToggle } from "../components/ThemeToggle";
-import { setActiveRoom, setRoomInfo, setRoomMembers } from "../features/chat/chatSlice";
-import { selectIsProfileComplete, selectProfile } from "../features/profile/profileSlice";
+import { UsersListPanel } from "../components/usersList/usersListPanel";
+import {
+  setActiveRoom,
+  setRoomInfo,
+  setRoomMembers,
+} from "../features/chat/chatSlice";
+import {
+  selectIsProfileComplete,
+  selectProfile,
+} from "../features/profile/profileSlice";
 import { selectResolvedTheme } from "../features/theme/themeSlice";
 import { useSocketCommand, useSocketState } from "../hooks/useSocket";
 import { useWebRTC } from "../hooks/useWebRTC";
 import { decryptRoomKey, getPublicKeyHex } from "../services/crypto";
 import { SocketCommands } from "../services/socket/SocketCommands";
 import type { RoomResponse } from "../services/socket/types";
-import { deriveDisplayNameFromUserId, getPersistentUserId } from "../utils/user";
+import {
+  deriveDisplayNameFromUserId,
+  getPersistentUserId,
+} from "../utils/user";
 
 function normalizeMeetingName(value: string) {
   return value
@@ -54,7 +67,7 @@ async function joinRoom(
   profile: { displayName: string; avatarId: number | null },
   hasJoinedRef: React.MutableRefObject<boolean>,
   retryOnConflict = true,
-): Promise<void> {
+): Promise<boolean> {
   try {
     const publicKey = await getPublicKeyHex();
 
@@ -103,6 +116,7 @@ async function joinRoom(
       console.log(
         `[MeetingRoom] Successfully initialized and joined: ${normalizedRoomName}`,
       );
+      return response.room_created;
     } else if (
       retryOnConflict &&
       message.toLowerCase().includes("already in another room")
@@ -137,6 +151,7 @@ async function joinRoom(
     toast.error("Failed to initialize room. Please try again.");
     hasJoinedRef.current = false;
   }
+  return false;
 }
 
 const RemoteVideo = ({
@@ -230,6 +245,7 @@ export function MeetingRoomPage() {
   } = useWebRTC();
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [availableDevices, setAvailableDevices] = useState<{
     audioInputs: MediaDeviceInfo[];
     videoInputs: MediaDeviceInfo[];
@@ -290,7 +306,9 @@ export function MeetingRoomPage() {
         avatarId: profile.avatarId,
       },
       hasJoinedRef,
-    );
+    ).then((created) => {
+      if (created) setIsInviteOpen(true);
+    });
   }, [
     normalizedRoomName,
     displayRoomName,
@@ -423,16 +441,32 @@ export function MeetingRoomPage() {
                   </button>
                 </>
               )}
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              title="Exit Room"
+              className={clsx(
+                "flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-all hover:scale-110 active:scale-95",
+                isDark
+                  ? "bg-rose-500/10 text-rose-400 hover:bg-rose-500/20"
+                  : "bg-rose-100 text-rose-600 hover:bg-rose-200",
+              )}
+            >
+              <LogOut size={18} />
+            </button>
             <ThemeToggle />
           </div>
         </header>
 
-        <main className="mt-5 flex min-h-0 flex-1 flex-col">
-          <ChatBox>
-            <ChatBox.Title />
-            <ChatBox.Body />
-            <ChatBox.Footer />
-          </ChatBox>
+        <main className="mt-5 flex min-h-0 flex-1 flex-row">
+          <UsersListPanel />
+          <div className="flex flex-col grow">
+            <ChatBox>
+              <ChatBox.Title />
+              <ChatBox.Body />
+              <ChatBox.Footer />
+            </ChatBox>
+          </div>
         </main>
       </div>
 
@@ -724,6 +758,14 @@ export function MeetingRoomPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Invite Others Popup */}
+      {isInviteOpen && chatState.roomStatus === "joined" && (
+        <InviteOthers
+          roomName={normalizedRoomName}
+          onClose={() => setIsInviteOpen(false)}
+        />
       )}
     </div>
   );

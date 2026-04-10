@@ -10,10 +10,11 @@ export function generateFileName(
   userId: string,
   extension: string,
   isPoster: boolean,
+  random?: string,
 ): string {
-  const random = Math.random().toString(36).substring(2, 8);
+  const rand = random ?? Math.random().toString(36).substring(2, 8);
   const posterTag = isPoster ? "_poster" : "";
-  return `${random}_${userId}${posterTag}.${extension}`;
+  return `${rand}_${userId}${posterTag}.${extension}`;
 }
 
 /**

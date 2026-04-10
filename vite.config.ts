@@ -17,4 +17,46 @@ export default defineConfig({
   server: {
     host: true,
   },
+  build: {
+    chunkSizeWarningLimit: 1000,
+    rolldownOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (
+              id.includes("/react/") ||
+              id.includes("/react-dom/") ||
+              id.includes("/react-router/") ||
+              id.includes("/react-router-dom/")
+            ) {
+              return "vendor-react";
+            }
+            if (
+              id.includes("/@reduxjs/toolkit/") ||
+              id.includes("/react-redux/")
+            ) {
+              return "vendor-state";
+            }
+            if (id.includes("/libsodium")) {
+              return "vendor-crypto";
+            }
+            if (
+              id.includes("/i18next/") ||
+              id.includes("/react-i18next/") ||
+              id.includes("/@tolgee/")
+            ) {
+              return "vendor-i18n";
+            }
+            if (
+              id.includes("/lucide-react/") ||
+              id.includes("/luxon/") ||
+              id.includes("/sonner/")
+            ) {
+              return "vendor-ui";
+            }
+          }
+        },
+      },
+    },
+  },
 });

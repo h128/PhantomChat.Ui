@@ -207,7 +207,7 @@ export function HomePage() {
                       className={clsx(
                         "flex-1",
                         isDark &&
-                          "border-slate-800 bg-slate-900/80 text-slate-100 placeholder:text-slate-500 focus:border-sky-400/60 focus:bg-slate-950 focus:ring-sky-400/10",
+                          "border-slate-800 bg-slate-900/80 text-white placeholder:text-slate-500 focus:border-sky-400/60 focus:bg-slate-950 focus:ring-sky-400/10 focus:text-black",
                       )}
                     />
 
@@ -244,7 +244,7 @@ export function HomePage() {
                       className={clsx(
                         "flex-1",
                         isDark &&
-                          "border-slate-800 bg-slate-900/80 text-slate-100 placeholder:text-slate-500 focus:border-sky-400/60 focus:bg-slate-950 focus:ring-sky-400/10",
+                          "border-slate-800 bg-slate-900/80 text-white placeholder:text-slate-500 focus:border-sky-400/60 focus:bg-slate-950 focus:ring-sky-400/10 focus:text-black",
                       )}
                     />
 

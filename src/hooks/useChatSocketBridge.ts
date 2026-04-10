@@ -9,7 +9,10 @@ import {
 } from "../features/chat/chatSlice";
 import type { RoomMember } from "../features/chat/chatSlice";
 import { useSocketEvent } from "./useSocket";
-import { deriveDisplayNameFromUserId, getPersistentUserId } from "../utils/user";
+import {
+  deriveDisplayNameFromUserId,
+  getPersistentUserId,
+} from "../utils/user";
 import { generateUUID } from "../utils/uuid";
 import type { ChatMessage } from "../features/chat/chatSlice";
 import type {
@@ -18,6 +21,7 @@ import type {
   RoomResponse,
   UserEnteredPayload,
 } from "../services/socket/types";
+import { useNotificationSound } from "./useNotificationSound";
 
 type BridgeMessageOptions = {
   createId?: () => string;
@@ -61,7 +65,8 @@ function toRoomMember(
   return {
     userId: payload.user_uuid,
     displayName:
-      payload.display_name?.trim() || deriveDisplayNameFromUserId(payload.user_uuid),
+      payload.display_name?.trim() ||
+      deriveDisplayNameFromUserId(payload.user_uuid),
     avatarId: typeof payload.avatar_id === "number" ? payload.avatar_id : null,
   };
 }
@@ -140,6 +145,7 @@ export function mapRoomMembers(roomId: string, response: RoomResponse) {
 export function useChatSocketBridge() {
   const dispatch = useDispatch();
   const activeRoomId = useSelector(selectActiveRoomId);
+  const playBeep = useNotificationSound();
 
   // 2. Consolidated Message Handler
   const handleIncomingMessage = (
@@ -174,6 +180,7 @@ export function useChatSocketBridge() {
       payload.sender_name || formatDisplayName(payload.sender_uuid),
       payload.message || "",
     );
+    playBeep();
   });
 
   // 4. User Entry Logic
@@ -195,6 +202,7 @@ export function useChatSocketBridge() {
       "System",
       `${formatDisplayName(payload.user_uuid)} entered the room.`,
     );
+    playBeep();
   });
 
   useSocketEvent("LeaveRoom", (payload) => {
@@ -211,6 +219,7 @@ export function useChatSocketBridge() {
     const currentUserId = getPersistentUserId();
     // Skip files uploaded by the current user (already shown via optimistic update)
     if (payload.user_uuid === currentUserId) return;
+    playBeep();
     // Only handle poster files for images (the original) or non-poster for regular files.
     // For images the backend sends two events: one poster=false (thumbnail) and one poster=true (original).
     // We only create a message on the poster=true event (the original), and use the thumbnail filename
