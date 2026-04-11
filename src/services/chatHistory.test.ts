@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { parseRoomHistoryNdjson } from "./chatHistory";
 
 describe("chatHistory", () => {
-  it("parses supported room history records and skips unsupported events", () => {
-    const result = parseRoomHistoryNdjson(
+  it("parses supported room history records and skips unsupported events", async () => {
+    const result = await parseRoomHistoryNdjson(
       "launch-pad",
       [
         JSON.stringify({
@@ -60,8 +60,8 @@ describe("chatHistory", () => {
     });
   });
 
-  it("skips malformed lines and join markers gracefully", () => {
-    const result = parseRoomHistoryNdjson(
+  it("skips malformed lines and join markers gracefully", async () => {
+    const result = await parseRoomHistoryNdjson(
       "signal-lab",
       [
         "{not-json}",

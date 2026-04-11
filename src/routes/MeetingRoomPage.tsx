@@ -331,6 +331,7 @@ export function MeetingRoomPage() {
       normalizedRoomName,
       getPersistentUserId(),
       abortController.signal,
+      chatState.roomKey,
     )
       .then((result) => {
         if (abortController.signal.aborted) {
@@ -372,7 +373,7 @@ export function MeetingRoomPage() {
     return () => {
       abortController.abort();
     };
-  }, [normalizedRoomName, chatState.roomStatus, dispatch]);
+  }, [normalizedRoomName, chatState.roomStatus, chatState.roomKey, dispatch]);
 
   // Handle Video Streams
   useEffect(() => {

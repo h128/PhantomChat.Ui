@@ -170,7 +170,8 @@ function isOptimisticEchoMatch(existing: ChatMessage, incoming: ChatMessage) {
 
 function sortRoomMessages(messages: ChatMessage[]) {
   messages.sort((left, right) => {
-    const delta = getTimestampValue(left.timestamp) - getTimestampValue(right.timestamp);
+    const delta =
+      getTimestampValue(left.timestamp) - getTimestampValue(right.timestamp);
     return delta === 0 ? 0 : delta;
   });
 }
@@ -193,7 +194,10 @@ function mergeRoomMessages(
     );
 
     if (exactMatch) {
-      if (exactMatch.origin === "history" && incomingMessage.origin === "realtime") {
+      if (
+        exactMatch.origin === "history" &&
+        incomingMessage.origin === "realtime"
+      ) {
         exactMatch.origin = "realtime";
       }
       continue;

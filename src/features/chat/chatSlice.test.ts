@@ -250,10 +250,7 @@ describe("chatSlice", () => {
   it("tracks room history loading state separately from room join state", () => {
     let state = chatReducer(undefined, { type: "chat/init" });
     state = chatReducer(state, setActiveRoom("signal-lab"));
-    state = chatReducer(
-      state,
-      startRoomHistoryLoad({ roomId: "signal-lab" }),
-    );
+    state = chatReducer(state, startRoomHistoryLoad({ roomId: "signal-lab" }));
     state = chatReducer(
       state,
       failRoomHistoryLoad({
