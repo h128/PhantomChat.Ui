@@ -107,3 +107,67 @@ export async function decryptFile(
   const ciphertext = encryptedBlob.slice(nonceLen);
   return sodium.crypto_secretbox_open_easy(ciphertext, nonce, key);
 }
+
+/**
+ * Envelope format for encrypted chat messages:
+ *   enc:v1:<base64(nonce || ciphertext)>
+ *
+ * Anything not matching the prefix is treated as legacy plaintext so
+ * historical (pre-encryption) messages keep rendering.
+ */
+const MESSAGE_ENVELOPE_PREFIX = "enc:v1:";
+
+export function isEncryptedMessageEnvelope(value: string): boolean {
+  return value.startsWith(MESSAGE_ENVELOPE_PREFIX);
+}
+
+/**
+ * Encrypts a UTF-8 string with the per-room key using libsodium secretbox
+ * (XSalsa20-Poly1305 authenticated encryption). The returned string is safe
+ * to send through the existing JSON message field.
+ */
+export async function encryptMessage(
+  plaintext: string,
+  roomKey: string,
+): Promise<string> {
+  await ensureReady();
+  const key = deriveKey(roomKey);
+  const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
+  const ciphertext = sodium.crypto_secretbox_easy(
+    sodium.from_string(plaintext),
+    nonce,
+    key,
+  );
+
+  const blob = new Uint8Array(nonce.length + ciphertext.length);
+  blob.set(nonce, 0);
+  blob.set(ciphertext, nonce.length);
+
+  return `${MESSAGE_ENVELOPE_PREFIX}${sodium.to_base64(blob, sodium.base64_variants.ORIGINAL)}`;
+}
+
+/**
+ * Decrypts a message envelope produced by encryptMessage. Values without the
+ * envelope prefix are returned unchanged so legacy plaintext history still
+ * renders. Throws on authentication failure / malformed ciphertext.
+ */
+export async function decryptMessage(
+  envelope: string,
+  roomKey: string,
+): Promise<string> {
+  if (!isEncryptedMessageEnvelope(envelope)) {
+    return envelope;
+  }
+
+  await ensureReady();
+  const key = deriveKey(roomKey);
+  const blob = sodium.from_base64(
+    envelope.slice(MESSAGE_ENVELOPE_PREFIX.length),
+    sodium.base64_variants.ORIGINAL,
+  );
+  const nonceLen = sodium.crypto_secretbox_NONCEBYTES;
+  const nonce = blob.slice(0, nonceLen);
+  const ciphertext = blob.slice(nonceLen);
+  const plaintext = sodium.crypto_secretbox_open_easy(ciphertext, nonce, key);
+  return sodium.to_string(plaintext);
+}

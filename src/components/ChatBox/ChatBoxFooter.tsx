@@ -17,7 +17,11 @@ import {
 import { selectProfile } from "../../features/profile/profileSlice";
 import { useSocketCommand } from "../../hooks/useSocket";
 import { useVoiceRecorder } from "../../hooks/useVoiceRecorder";
-import { encryptFile, isEncryptionEnabled } from "../../services/crypto";
+import {
+  encryptFile,
+  encryptMessage,
+  isEncryptionEnabled,
+} from "../../services/crypto";
 import {
   createThumbnail,
   generateFileName,
@@ -152,13 +156,28 @@ export function ChatBoxFooter() {
     setValue("");
     setShowEmojiPicker(false);
 
-    // 2. Network Sync (Socket)
+    // 2. Network Sync (Socket) — encrypt body with room key when available.
+    let wirePayload = trimmed;
+    if (roomKey && roomKey !== "no-key") {
+      try {
+        wirePayload = await encryptMessage(trimmed, roomKey);
+      } catch (err) {
+        console.error("Failed to encrypt outgoing message:", err);
+        toast.error("Failed to encrypt message. Please try again.");
+        return;
+      }
+    } else {
+      console.warn(
+        "[ChatBoxFooter] Sending message without encryption (no room key).",
+      );
+    }
+
     let response: CommandResponse | undefined;
     try {
       response = (await sendCommand(SocketCommands.SEND_MESSAGE, {
         user_uuid: userId,
         room_name: activeRoomId,
-        message: trimmed,
+        message: wirePayload,
       })) as CommandResponse;
     } catch (err) {
       console.error("Failed to send socket message:", err);

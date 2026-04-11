@@ -3,12 +3,14 @@ import {
   createChatMessageFromFileUploadedPayload,
   createChatMessageFromNewMessagePayload,
   createSystemMessageFromUserEnteredPayload,
+  resolveIncomingMessageBody,
 } from "../features/chat/chatMessageMappers";
 import type {
   FileUploadedPayload,
   NewMessagePayload,
   UserEnteredPayload,
 } from "./socket/types";
+import { decryptMessage, isEncryptedMessageEnvelope } from "./crypto";
 
 const BASE_URL = import.meta.env.VITE_HTTP_URL;
 
@@ -38,23 +40,32 @@ function createHistoryMessageId(roomName: string, lineNumber: number) {
   return `history:${roomName}:${lineNumber}`;
 }
 
-function mapHistoryRecordToMessage(
+async function mapHistoryRecordToMessage(
   record: HistoryRecord,
   roomName: string,
   lineNumber: number,
   currentUserId: string,
-): ChatMessage | null {
+  roomKey: string | null | undefined,
+): Promise<ChatMessage | null> {
   const options = {
     createId: () => createHistoryMessageId(roomName, lineNumber),
     origin: "history" as const,
   };
 
   switch (record.event_name) {
-    case "NewMessageReceived":
+    case "NewMessageReceived": {
+      const payload = record as NewMessagePayload;
+      const decryptedBody = await resolveIncomingMessageBody(
+        payload.message ?? "",
+        roomKey,
+        decryptMessage,
+        isEncryptedMessageEnvelope,
+      );
       return createChatMessageFromNewMessagePayload(
-        record as NewMessagePayload,
+        { ...payload, message: decryptedBody },
         options,
       );
+    }
     case "UserEnteredRoom":
       return createSystemMessageFromUserEnteredPayload(
         record as UserEnteredPayload,
@@ -71,11 +82,12 @@ function mapHistoryRecordToMessage(
   }
 }
 
-export function parseRoomHistoryNdjson(
+export async function parseRoomHistoryNdjson(
   roomName: string,
   ndjson: string,
   currentUserId = "",
-): RoomHistoryResult {
+  roomKey?: string | null,
+): Promise<RoomHistoryResult> {
   const messages: ChatMessage[] = [];
   let malformedLineCount = 0;
 
@@ -88,25 +100,28 @@ export function parseRoomHistoryNdjson(
       continue;
     }
 
+    let parsed: unknown;
     try {
-      const parsed = JSON.parse(line) as unknown;
-
-      if (!isHistoryRecord(parsed)) {
-        malformedLineCount += 1;
-        continue;
-      }
-
-      const message = mapHistoryRecordToMessage(
-        parsed,
-        roomName,
-        index + 1,
-        currentUserId,
-      );
-      if (message) {
-        messages.push(message);
-      }
+      parsed = JSON.parse(line);
     } catch {
       malformedLineCount += 1;
+      continue;
+    }
+
+    if (!isHistoryRecord(parsed)) {
+      malformedLineCount += 1;
+      continue;
+    }
+
+    const message = await mapHistoryRecordToMessage(
+      parsed,
+      roomName,
+      index + 1,
+      currentUserId,
+      roomKey,
+    );
+    if (message) {
+      messages.push(message);
     }
   }
 
@@ -117,6 +132,7 @@ export async function fetchRoomHistory(
   roomName: string,
   currentUserId = "",
   signal?: AbortSignal,
+  roomKey?: string | null,
 ): Promise<RoomHistoryResult> {
   const filename = `${roomName}.ndjson`;
   const response = await fetch(
@@ -137,5 +153,5 @@ export async function fetchRoomHistory(
     return { messages: [], malformedLineCount: 0 };
   }
 
-  return parseRoomHistoryNdjson(roomName, ndjson, currentUserId);
+  return parseRoomHistoryNdjson(roomName, ndjson, currentUserId, roomKey);
 }

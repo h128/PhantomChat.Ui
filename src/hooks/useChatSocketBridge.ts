@@ -4,12 +4,14 @@ import {
   messageReceived,
   removeRoomMember,
   selectActiveRoomId,
+  selectRoomKey,
   upsertRoomMember,
 } from "../features/chat/chatSlice";
 import {
   createChatMessageFromFileUploadedPayload,
   createChatMessageFromNewMessagePayload,
   createSystemMessageFromUserEnteredPayload,
+  resolveIncomingMessageBody,
   resolveMessageRoomId,
   toRoomMember,
 } from "../features/chat/chatMessageMappers";
@@ -20,17 +22,27 @@ import type {
   NewMessagePayload,
   UserEnteredPayload,
 } from "../services/socket/types";
+import { decryptMessage, isEncryptedMessageEnvelope } from "../services/crypto";
 import { useNotificationSound } from "./useNotificationSound";
 
 export function useChatSocketBridge() {
   const dispatch = useDispatch();
   const activeRoomId = useSelector(selectActiveRoomId);
+  const roomKey = useSelector(selectRoomKey);
   const playBeep = useNotificationSound();
 
-  useSocketEvent("NewMessageReceived", (payload: NewMessagePayload) => {
-    const message = createChatMessageFromNewMessagePayload(payload, {
-      origin: "realtime",
-    });
+  useSocketEvent("NewMessageReceived", async (payload: NewMessagePayload) => {
+    const decryptedBody = await resolveIncomingMessageBody(
+      payload.message ?? "",
+      roomKey,
+      decryptMessage,
+      isEncryptedMessageEnvelope,
+    );
+
+    const message = createChatMessageFromNewMessagePayload(
+      { ...payload, message: decryptedBody },
+      { origin: "realtime" },
+    );
 
     if (!message) {
       return;

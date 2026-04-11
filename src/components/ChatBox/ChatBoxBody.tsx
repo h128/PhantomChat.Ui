@@ -429,9 +429,7 @@ export function ChatBoxBody() {
           <div
             className={clsx(
               "inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium",
-              isDark
-                ? "bg-sky-400/10 text-sky-300"
-                : "bg-sky-100 text-sky-700",
+              isDark ? "bg-sky-400/10 text-sky-300" : "bg-sky-100 text-sky-700",
             )}
           >
             <span className="h-2 w-2 animate-pulse rounded-full bg-current" />
@@ -455,7 +453,8 @@ export function ChatBoxBody() {
               isDark ? "text-amber-300" : "text-amber-700",
             )}
           >
-            Previous history is unavailable right now. Live chat is still active.
+            Previous history is unavailable right now. Live chat is still
+            active.
           </p>
         )}
       </div>

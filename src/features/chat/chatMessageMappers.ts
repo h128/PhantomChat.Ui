@@ -1,8 +1,4 @@
-import type {
-  ChatMessage,
-  ChatMessageOrigin,
-  RoomMember,
-} from "./chatSlice";
+import type { ChatMessage, ChatMessageOrigin, RoomMember } from "./chatSlice";
 import type {
   FileUploadedPayload,
   NewMessagePayload,
@@ -97,6 +93,40 @@ export function createChatMessageFromNewMessagePayload(
     timestamp: resolveMessageTimestamp(payload.timestamp, options.getTimestamp),
     origin: options.origin ?? "realtime",
   };
+}
+
+const ENCRYPTED_MESSAGE_PLACEHOLDER = "[encrypted message]";
+
+/**
+ * Resolves the plaintext body of an incoming message payload, decrypting it
+ * with the supplied room key when the body carries an encryption envelope.
+ * Non-envelope values (legacy plaintext, control markers like __JOIN__) pass
+ * through untouched so old history keeps rendering.
+ *
+ * Decryption failures never throw — they return a placeholder and log, so a
+ * single bad frame can't take down the chat view.
+ */
+export async function resolveIncomingMessageBody(
+  rawBody: string,
+  roomKey: string | null | undefined,
+  decryptor: (envelope: string, roomKey: string) => Promise<string>,
+  isEnvelope: (value: string) => boolean,
+): Promise<string> {
+  if (!rawBody || !isEnvelope(rawBody)) {
+    return rawBody;
+  }
+  if (!roomKey || roomKey === "no-key") {
+    console.warn(
+      "[chatMessageMappers] Received encrypted message without a room key.",
+    );
+    return ENCRYPTED_MESSAGE_PLACEHOLDER;
+  }
+  try {
+    return await decryptor(rawBody, roomKey);
+  } catch (err) {
+    console.warn("[chatMessageMappers] Failed to decrypt message:", err);
+    return ENCRYPTED_MESSAGE_PLACEHOLDER;
+  }
 }
 
 export function createSystemMessageFromUserEnteredPayload(

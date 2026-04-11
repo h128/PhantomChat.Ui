@@ -73,9 +73,7 @@ describe("chatMessageMappers", () => {
   });
 
   it("resolves room ids from payload room, active room, and fallback", () => {
-    expect(resolveMessageRoomId("launch-pad", "signal-lab")).toBe(
-      "launch-pad",
-    );
+    expect(resolveMessageRoomId("launch-pad", "signal-lab")).toBe("launch-pad");
     expect(resolveMessageRoomId(undefined, "signal-lab")).toBe("signal-lab");
     expect(resolveMessageRoomId(undefined, "")).toBe("general");
   });
