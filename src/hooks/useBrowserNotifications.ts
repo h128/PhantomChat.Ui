@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ChatMessage } from "../features/chat/chatSlice";
+import { useAppSelector } from "../app/hooks";
+import { getAvatarById } from "../features/profile/avatarCatalog";
 import {
   getAppActivityState,
   getNotificationPermissionState,
@@ -51,11 +53,18 @@ export function useNotificationPermission() {
 
 export function useMessageNotifications() {
   const playBeep = useNotificationSound();
+  const membersByRoom = useAppSelector((state) => state.chat.membersByRoom);
 
   const notifyIncomingMessage = useCallback(
     async (roomId: string, message: ChatMessage) => {
       const currentUserId = getPersistentUserId();
       const appActivityState = getAppActivityState();
+      const roomMember = membersByRoom[roomId]?.[message.senderId];
+      const senderLabel =
+        roomMember?.displayName?.trim() ||
+        message.senderId ||
+        message.senderName;
+      const avatarUrl = getAvatarById(roomMember?.avatarId)?.src ?? null;
 
       if (
         !shouldNotifyForIncomingMessage({
@@ -67,15 +76,19 @@ export function useMessageNotifications() {
         return;
       }
 
-      const shown = await showChatNotification({ roomId, message }).catch(
-        () => false,
-      );
+      const shown = await showChatNotification({
+        roomId,
+        message,
+        senderLabel,
+        iconUrl: avatarUrl,
+        imageUrl: avatarUrl,
+      }).catch(() => false);
 
       if (!shown) {
         playBeep();
       }
     },
-    [playBeep],
+    [membersByRoom, playBeep],
   );
 
   return { notifyIncomingMessage };

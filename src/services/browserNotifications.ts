@@ -9,6 +9,9 @@ export type AppActivityState = "active" | "inactive" | "hidden";
 type ChatNotificationInput = {
   roomId: string;
   message: ChatMessage;
+  senderLabel?: string;
+  iconUrl?: string | null;
+  imageUrl?: string | null;
 };
 
 const SERVICE_WORKER_PATH = "/chat-notifications-sw.js";
@@ -93,8 +96,8 @@ export function createNotificationBody(message: ChatMessage) {
 }
 
 export function createNotificationTitle(roomId: string, senderName: string) {
-  const roomName = formatRoomName(roomId) || roomId;
-  return `${senderName} in ${roomName}`;
+//   const roomName = formatRoomName(roomId) || roomId;
+  return `${senderName}`;
 }
 
 export async function registerChatNotificationServiceWorker() {
@@ -130,6 +133,9 @@ export async function requestBrowserNotificationPermission() {
 export async function showChatNotification({
   roomId,
   message,
+  senderLabel,
+  iconUrl,
+  imageUrl,
 }: ChatNotificationInput) {
   if (getNotificationPermissionState() !== "granted") {
     return false;
@@ -139,16 +145,21 @@ export async function showChatNotification({
     (await registerChatNotificationServiceWorker().catch(() => null)) ||
     (await navigator.serviceWorker.getRegistration().catch(() => undefined));
 
-  const title = createNotificationTitle(roomId, message.senderName);
+  const title = createNotificationTitle(
+    roomId,
+    senderLabel || message.senderId || message.senderName,
+  );
   const body = createNotificationBody(message);
   const targetUrl = `/room/${encodeURIComponent(roomId)}`;
+  const resolvedIconUrl = iconUrl || CHAT_ICON_PATH;
 
   if (registration?.showNotification) {
     await registration.showNotification(title, {
       body,
       tag: `chat:${roomId}:${message.id}`,
-      icon: CHAT_ICON_PATH,
+      icon: resolvedIconUrl,
       badge: CHAT_ICON_PATH,
+      ...(imageUrl ? { image: imageUrl } : {}),
       data: {
         roomId,
         url: targetUrl,
@@ -161,7 +172,7 @@ export async function showChatNotification({
   if (typeof Notification !== "undefined") {
     new Notification(title, {
       body,
-      icon: CHAT_ICON_PATH,
+      icon: resolvedIconUrl,
       tag: `chat:${roomId}:${message.id}`,
       data: {
         roomId,

@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   createNotificationBody,
   createNotificationTitle,
   getAppActivityState,
+  showChatNotification,
   shouldNotifyForIncomingMessage,
 } from "./browserNotifications";
 
@@ -77,7 +78,7 @@ describe("browserNotifications", () => {
 
   it("creates readable notification titles and bodies", () => {
     expect(createNotificationTitle("signal-lab", "Alpha")).toBe(
-      "Alpha in Signal Lab",
+      "Alpha",
     );
 
     expect(
@@ -94,5 +95,74 @@ describe("browserNotifications", () => {
         },
       }),
     ).toBe("Sent a voice message");
+  });
+
+  it("prefers resolved sender labels over raw message sender names", async () => {
+    const notificationSpy = {
+      showNotification: vi.fn().mockResolvedValue(undefined),
+    };
+
+    const originalNotification = globalThis.Notification;
+    const originalNavigator = globalThis.navigator;
+    const originalWindow = globalThis.window;
+
+    Object.defineProperty(globalThis, "Notification", {
+      configurable: true,
+      value: { permission: "granted" },
+    });
+
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        Notification: globalThis.Notification,
+      },
+    });
+
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: {
+        serviceWorker: {
+          register: vi.fn().mockResolvedValue(notificationSpy),
+          getRegistration: vi.fn().mockResolvedValue(notificationSpy),
+        },
+      },
+    });
+
+    await showChatNotification({
+      roomId: "signal-lab",
+      senderLabel: "Alpha",
+      iconUrl: "/avatar-alpha.svg",
+      imageUrl: "/avatar-alpha.svg",
+      message: {
+        id: "msg-3",
+        senderId: "user_alpha_123",
+        senderName: "user_alpha_123",
+        content: "Hello there",
+        timestamp: "2026-04-11T12:00:00.000Z",
+      },
+    });
+
+    expect(notificationSpy.showNotification).toHaveBeenCalledWith(
+      "Alpha",
+      expect.objectContaining({
+        icon: "/avatar-alpha.svg",
+        image: "/avatar-alpha.svg",
+      }),
+    );
+
+    Object.defineProperty(globalThis, "Notification", {
+      configurable: true,
+      value: originalNotification,
+    });
+
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: originalNavigator,
+    });
+
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: originalWindow,
+    });
   });
 });
