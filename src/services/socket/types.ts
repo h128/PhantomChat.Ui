@@ -40,6 +40,7 @@ export type NewMessagePayload = {
   sender_name?: string;
   message: string;
   room_name?: string;
+  timestamp?: string;
 };
 
 export type UserEnteredPayload = {
@@ -47,18 +48,22 @@ export type UserEnteredPayload = {
   room_name: string;
   avatar_id?: number;
   display_name?: string;
+  timestamp?: string;
 };
 
 export type LeaveRoomPayload = {
   user_uuid: string;
   room_name: string;
+  timestamp?: string;
 };
 
 export type FileUploadedPayload = {
   event_name: "FileUploaded";
   file_name: string;
+  room_name?: string;
   user_uuid: string;
   poster: boolean;
+  timestamp?: string;
 };
 
 export type SignalingData = {

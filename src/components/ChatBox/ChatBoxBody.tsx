@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useAppSelector } from "../../app/hooks";
 import { UserAvatar } from "../../components/UserAvatar";
 import {
+  selectActiveRoomHistory,
   selectActiveRoomId,
   selectActiveRoomMessages,
   selectActiveRoomMembers,
@@ -407,6 +408,7 @@ function FileAttachmentCard({
 export function ChatBoxBody() {
   const { isDark } = useChatBox();
   const messages = useAppSelector(selectActiveRoomMessages);
+  const historyState = useAppSelector(selectActiveRoomHistory);
   const activeRoomId = useAppSelector(selectActiveRoomId);
   const roomMembers = useAppSelector(selectActiveRoomMembers);
   const profile = useAppSelector(selectProfile);
@@ -417,23 +419,71 @@ export function ChatBoxBody() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
+  const showLoadingBanner = historyState.status === "loading";
+  const showHistoryError = historyState.status === "error";
+
   if (messages.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center">
+      <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
+        {showLoadingBanner && (
+          <div
+            className={clsx(
+              "inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium",
+              isDark
+                ? "bg-sky-400/10 text-sky-300"
+                : "bg-sky-100 text-sky-700",
+            )}
+          >
+            <span className="h-2 w-2 animate-pulse rounded-full bg-current" />
+            Loading room history...
+          </div>
+        )}
         <p
           className={clsx(
             "text-sm",
             isDark ? "text-slate-500" : "text-slate-400",
           )}
         >
-          No messages yet. Start the conversation!
+          {showLoadingBanner
+            ? "Messages will appear here as history finishes loading."
+            : "No messages yet. Start the conversation!"}
         </p>
+        {showHistoryError && (
+          <p
+            className={clsx(
+              "text-xs",
+              isDark ? "text-amber-300" : "text-amber-700",
+            )}
+          >
+            Previous history is unavailable right now. Live chat is still active.
+          </p>
+        )}
       </div>
     );
   }
 
   return (
     <div className="flex-1 space-y-2 overflow-y-auto px-3 py-4 sm:px-5">
+      {(showLoadingBanner || showHistoryError) && (
+        <div className="flex justify-center pb-1">
+          <div
+            className={clsx(
+              "rounded-full px-3 py-1 text-xs font-medium",
+              showLoadingBanner
+                ? isDark
+                  ? "bg-sky-400/10 text-sky-300"
+                  : "bg-sky-100 text-sky-700"
+                : isDark
+                  ? "bg-amber-400/10 text-amber-300"
+                  : "bg-amber-100 text-amber-700",
+            )}
+          >
+            {showLoadingBanner
+              ? "Loading earlier messages..."
+              : "History unavailable. Live chat is still active."}
+          </div>
+        </div>
+      )}
       {messages.map((msg) => {
         const isOwn = msg.senderId === getPersistentUserId();
         const roomMember = roomMembers[msg.senderId];

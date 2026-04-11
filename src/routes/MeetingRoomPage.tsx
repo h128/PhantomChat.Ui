@@ -21,10 +21,14 @@ import { InviteOthers } from "../components/InviteOthers";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { UsersListPanel } from "../components/usersList/usersListPanel";
 import {
+  completeRoomHistoryLoad,
+  failRoomHistoryLoad,
   setActiveRoom,
+  startRoomHistoryLoad,
   setRoomInfo,
   setRoomMembers,
 } from "../features/chat/chatSlice";
+import { mapRoomMembersFromResponse } from "../features/chat/chatMessageMappers";
 import {
   selectIsProfileComplete,
   selectProfile,
@@ -33,12 +37,10 @@ import { selectResolvedTheme } from "../features/theme/themeSlice";
 import { useSocketCommand, useSocketState } from "../hooks/useSocket";
 import { useWebRTC } from "../hooks/useWebRTC";
 import { decryptRoomKey, getPublicKeyHex } from "../services/crypto";
+import { fetchRoomHistory } from "../services/chatHistory";
 import { SocketCommands } from "../services/socket/SocketCommands";
 import type { RoomResponse } from "../services/socket/types";
-import {
-  deriveDisplayNameFromUserId,
-  getPersistentUserId,
-} from "../utils/user";
+import { getPersistentUserId } from "../utils/user";
 
 function normalizeMeetingName(value: string) {
   return value
@@ -67,7 +69,7 @@ async function joinRoom(
   profile: { displayName: string; avatarId: number | null },
   hasJoinedRef: React.MutableRefObject<boolean>,
   retryOnConflict = true,
-): Promise<boolean> {
+): Promise<{ roomCreated: boolean } | null> {
   try {
     const publicKey = await getPublicKeyHex();
 
@@ -99,14 +101,7 @@ async function joinRoom(
       dispatch(
         setRoomMembers({
           roomId: normalizedRoomName,
-          members: response.members.map((member) => ({
-            userId: member.user_uuid,
-            displayName:
-              member.display_name?.trim() ||
-              deriveDisplayNameFromUserId(member.user_uuid),
-            avatarId:
-              typeof member.avatar_id === "number" ? member.avatar_id : null,
-          })),
+          members: mapRoomMembersFromResponse(response),
         }),
       );
 
@@ -116,7 +111,7 @@ async function joinRoom(
       console.log(
         `[MeetingRoom] Successfully initialized and joined: ${normalizedRoomName}`,
       );
-      return response.room_created;
+      return { roomCreated: response.room_created };
     } else if (
       retryOnConflict &&
       message.toLowerCase().includes("already in another room")
@@ -151,7 +146,7 @@ async function joinRoom(
     toast.error("Failed to initialize room. Please try again.");
     hasJoinedRef.current = false;
   }
-  return false;
+  return null;
 }
 
 const RemoteVideo = ({
@@ -306,8 +301,10 @@ export function MeetingRoomPage() {
         avatarId: profile.avatarId,
       },
       hasJoinedRef,
-    ).then((created) => {
-      if (created) setIsInviteOpen(true);
+    ).then((result) => {
+      if (result?.roomCreated) {
+        setIsInviteOpen(true);
+      }
     });
   }, [
     normalizedRoomName,
@@ -320,6 +317,62 @@ export function MeetingRoomPage() {
     chatState.roomStatus,
     chatState.activeRoomId,
   ]);
+
+  useEffect(() => {
+    if (!normalizedRoomName || chatState.roomStatus !== "joined") {
+      return;
+    }
+
+    const abortController = new AbortController();
+
+    dispatch(startRoomHistoryLoad({ roomId: normalizedRoomName }));
+
+    fetchRoomHistory(
+      normalizedRoomName,
+      getPersistentUserId(),
+      abortController.signal,
+    )
+      .then((result) => {
+        if (abortController.signal.aborted) {
+          return;
+        }
+
+        if (result.malformedLineCount > 0) {
+          console.warn(
+            `[MeetingRoom] Skipped ${result.malformedLineCount} malformed history lines for ${normalizedRoomName}.`,
+          );
+        }
+
+        dispatch(
+          completeRoomHistoryLoad({
+            roomId: normalizedRoomName,
+            messages: result.messages,
+            loadedAt: new Date().toISOString(),
+          }),
+        );
+      })
+      .catch((error: unknown) => {
+        if (abortController.signal.aborted) {
+          return;
+        }
+
+        console.error(
+          `[MeetingRoom] Failed to load room history for ${normalizedRoomName}:`,
+          error,
+        );
+
+        dispatch(
+          failRoomHistoryLoad({
+            roomId: normalizedRoomName,
+            error: "History could not be loaded.",
+          }),
+        );
+      });
+
+    return () => {
+      abortController.abort();
+    };
+  }, [normalizedRoomName, chatState.roomStatus, dispatch]);
 
   // Handle Video Streams
   useEffect(() => {

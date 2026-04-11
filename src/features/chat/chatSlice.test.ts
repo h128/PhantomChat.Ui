@@ -2,11 +2,15 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import themeReducer from "../theme/themeSlice";
 import chatReducer, {
   addMessage,
+  completeRoomHistoryLoad,
   cyclePresenceMode,
+  failRoomHistoryLoad,
   messageReceived,
   selectActiveRoom,
+  selectActiveRoomHistory,
   selectActiveRoomMessages,
   selectActiveRoomId,
+  startRoomHistoryLoad,
   setActiveRoom,
   setRoomMembers,
   setRoomInfo,
@@ -43,13 +47,13 @@ describe("chatSlice", () => {
   it("cycles presence mode through the expected order", () => {
     let state = chatReducer(undefined, { type: "chat/init" });
 
-    state = chatReducer(state, cyclePresenceMode());
+    state = chatReducer(state, cyclePresenceMode(undefined));
     expect(state.presenceMode).toBe("available");
 
-    state = chatReducer(state, cyclePresenceMode());
+    state = chatReducer(state, cyclePresenceMode(undefined));
     expect(state.presenceMode).toBe("quiet");
 
-    state = chatReducer(state, cyclePresenceMode());
+    state = chatReducer(state, cyclePresenceMode(undefined));
     expect(state.presenceMode).toBe("focused");
   });
 
@@ -142,6 +146,129 @@ describe("chatSlice", () => {
         timestamp: "2026-04-02T10:00:00.000Z",
       },
     ]);
+  });
+
+  it("merges history with realtime messages without duplicating overlap", () => {
+    let state = chatReducer(undefined, { type: "chat/init" });
+    state = chatReducer(state, setActiveRoom("signal-lab"));
+    state = chatReducer(
+      state,
+      messageReceived({
+        roomId: "signal-lab",
+        message: {
+          id: "live-1",
+          senderId: "user_2",
+          senderName: "User 2",
+          content: "Second",
+          timestamp: "2026-04-02T10:02:00.000Z",
+          origin: "realtime",
+        },
+      }),
+    );
+
+    state = chatReducer(
+      state,
+      completeRoomHistoryLoad({
+        roomId: "signal-lab",
+        loadedAt: "2026-04-02T10:03:00.000Z",
+        messages: [
+          {
+            id: "history-1",
+            senderId: "user_1",
+            senderName: "User 1",
+            content: "First",
+            timestamp: "2026-04-02T10:01:00.000Z",
+            origin: "history",
+          },
+          {
+            id: "history-2",
+            senderId: "user_2",
+            senderName: "User 2",
+            content: "Second",
+            timestamp: "2026-04-02T10:02:00.000Z",
+            origin: "history",
+          },
+        ],
+      }),
+    );
+
+    expect(state.messages["signal-lab"]).toEqual([
+      {
+        id: "history-1",
+        senderId: "user_1",
+        senderName: "User 1",
+        content: "First",
+        timestamp: "2026-04-02T10:01:00.000Z",
+        origin: "history",
+      },
+      {
+        id: "live-1",
+        senderId: "user_2",
+        senderName: "User 2",
+        content: "Second",
+        timestamp: "2026-04-02T10:02:00.000Z",
+        origin: "realtime",
+      },
+    ]);
+  });
+
+  it("reconciles optimistic echoes with realtime deliveries", () => {
+    let state = chatReducer(undefined, { type: "chat/init" });
+    state = chatReducer(state, setActiveRoom("signal-lab"));
+    state = chatReducer(
+      state,
+      addMessage({
+        roomId: "signal-lab",
+        content: "Echo check",
+        senderName: "User test",
+      }),
+    );
+
+    state = chatReducer(
+      state,
+      messageReceived({
+        roomId: "signal-lab",
+        message: {
+          id: "server-1",
+          senderId: "user_test_123",
+          senderName: "User test",
+          content: "Echo check",
+          timestamp: "2026-04-02T10:00:05.000Z",
+          origin: "realtime",
+        },
+      }),
+    );
+
+    expect(state.messages["signal-lab"]).toHaveLength(1);
+    expect(state.messages["signal-lab"][0]).toMatchObject({
+      senderId: "user_test_123",
+      content: "Echo check",
+      origin: "realtime",
+    });
+  });
+
+  it("tracks room history loading state separately from room join state", () => {
+    let state = chatReducer(undefined, { type: "chat/init" });
+    state = chatReducer(state, setActiveRoom("signal-lab"));
+    state = chatReducer(
+      state,
+      startRoomHistoryLoad({ roomId: "signal-lab" }),
+    );
+    state = chatReducer(
+      state,
+      failRoomHistoryLoad({
+        roomId: "signal-lab",
+        error: "History could not be loaded.",
+      }),
+    );
+
+    const rootState = createRootState(state);
+
+    expect(selectActiveRoomHistory(rootState)).toEqual({
+      status: "error",
+      error: "History could not be loaded.",
+      lastLoadedAt: null,
+    });
   });
 
   it("returns active room selectors from root state", () => {

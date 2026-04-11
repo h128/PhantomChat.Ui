@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  createChatMessageFromFileUploadedPayload,
+  createChatMessageFromNewMessagePayload,
+  createSystemMessageFromUserEnteredPayload,
   formatDisplayName,
-  mapNewMessagePayloadToAction,
-  mapRoomMembers,
-  mapUserEnteredPayloadToAction,
-} from "./useChatSocketBridge";
+  mapRoomMembersFromResponse,
+  resolveMessageRoomId,
+} from "../features/chat/chatMessageMappers";
 
 const fixedMessageOptions = {
   createId: () => "message-1",
@@ -17,122 +19,95 @@ const expectedMappedMessage = {
   senderName: "Alpha",
   content: "Hello team",
   timestamp: "2026-04-02T10:30:00.000Z",
+  origin: "realtime",
 };
 
-describe("useChatSocketBridge helpers", () => {
+describe("chatMessageMappers", () => {
   it("formats display names from structured user ids", () => {
     expect(formatDisplayName("user_alpha_123")).toBe("User alpha");
     expect(formatDisplayName("")).toBe("Unknown");
   });
 
-  it("maps new message payloads into Redux actions", () => {
-    const action = mapNewMessagePayloadToAction(
+  it("maps new message payloads into chat messages", () => {
+    const message = createChatMessageFromNewMessagePayload(
       {
         sender_uuid: "user_alpha_123",
         sender_name: "Alpha",
         room_name: "launch-pad",
         message: "Hello team",
+        timestamp: "2026-04-02T10:30:00.000Z",
       },
-      "signal-lab",
       fixedMessageOptions,
     );
 
-    expect(action).toMatchObject({
-      type: "chat/messageReceived",
-      payload: {
-        roomId: "launch-pad",
-        message: expectedMappedMessage,
-      },
-    });
+    expect(message).toMatchObject(expectedMappedMessage);
   });
 
   it("ignores join marker messages to avoid duplicate room-entry chatter", () => {
-    const action = mapNewMessagePayloadToAction(
+    const action = createChatMessageFromNewMessagePayload(
       {
         sender_uuid: "user_alpha_123",
         room_name: "launch-pad",
         message: "__JOIN__",
       },
-      "signal-lab",
       fixedMessageOptions,
     );
 
     expect(action).toBeNull();
   });
 
-  it("falls back to derived sender names and active room ids when needed", () => {
-    const action = mapNewMessagePayloadToAction(
+  it("falls back to derived sender names when needed", () => {
+    const message = createChatMessageFromNewMessagePayload(
       {
         sender_uuid: "user_bravo_456",
         message: "Fallback path",
       },
-      "signal-lab",
       fixedMessageOptions,
     );
 
-    expect(action).toMatchObject({
-      payload: {
-        roomId: "signal-lab",
-        message: {
-          senderId: "user_bravo_456",
-          senderName: "User bravo",
-          content: "Fallback path",
-        },
-      },
+    expect(message).toMatchObject({
+      senderId: "user_bravo_456",
+      senderName: "User bravo",
+      content: "Fallback path",
     });
   });
 
-  it("falls back to the general room when there is no payload room or active room", () => {
-    const action = mapNewMessagePayloadToAction(
-      {
-        sender_uuid: "user_charlie_789",
-        message: "No active room",
-      },
-      "",
-      fixedMessageOptions,
+  it("resolves room ids from payload room, active room, and fallback", () => {
+    expect(resolveMessageRoomId("launch-pad", "signal-lab")).toBe(
+      "launch-pad",
     );
-
-    expect(action).toMatchObject({
-      payload: {
-        roomId: "general",
-      },
-    });
+    expect(resolveMessageRoomId(undefined, "signal-lab")).toBe("signal-lab");
+    expect(resolveMessageRoomId(undefined, "")).toBe("general");
   });
 
   it("maps other-user room entry payloads into system messages", () => {
-    const action = mapUserEnteredPayloadToAction(
+    const message = createSystemMessageFromUserEnteredPayload(
       {
         user_uuid: "user_delta_001",
         room_name: "launch-pad",
         display_name: "Delta",
+        timestamp: "2026-04-02T10:30:00.000Z",
       },
-      "signal-lab",
       "user_self_999",
       fixedMessageOptions,
     );
 
-    expect(action).toMatchObject({
-      type: "chat/messageReceived",
-      payload: {
-        roomId: "launch-pad",
-        message: {
-          id: "message-1",
-          senderId: "system",
-          senderName: "System",
-          content: "Delta entered the room.",
-          timestamp: "2026-04-02T10:30:00.000Z",
-        },
-      },
+    expect(message).toMatchObject({
+      id: "message-1",
+      senderId: "system",
+      senderName: "System",
+      content: "Delta entered the room.",
+      timestamp: "2026-04-02T10:30:00.000Z",
+      origin: "realtime",
     });
   });
 
   it("ignores room entry events for the current user", () => {
-    const action = mapUserEnteredPayloadToAction(
+    const action = createSystemMessageFromUserEnteredPayload(
       {
         user_uuid: "user_self_999",
         room_name: "launch-pad",
       },
-      "signal-lab",
       "user_self_999",
       fixedMessageOptions,
     );
@@ -141,7 +116,7 @@ describe("useChatSocketBridge helpers", () => {
   });
 
   it("maps backend room members into normalized chat members", () => {
-    const action = mapRoomMembers("launch-pad", {
+    const members = mapRoomMembersFromResponse({
       request_uuid: "request-1",
       status: 0,
       room_name: "launch-pad",
@@ -156,17 +131,35 @@ describe("useChatSocketBridge helpers", () => {
       ],
     });
 
-    expect(action).toMatchObject({
-      type: "chat/setRoomMembers",
-      payload: {
-        roomId: "launch-pad",
-        members: [
-          {
-            userId: "user_alpha_123",
-            avatarId: 2,
-            displayName: "Alpha",
-          },
-        ],
+    expect(members).toEqual([
+      {
+        userId: "user_alpha_123",
+        avatarId: 2,
+        displayName: "Alpha",
+      },
+    ]);
+  });
+
+  it("maps file upload payloads into attachment messages", () => {
+    const message = createChatMessageFromFileUploadedPayload(
+      {
+        event_name: "FileUploaded",
+        file_name: "voice-note.webm",
+        user_uuid: "user_echo_321",
+        poster: false,
+        timestamp: "2026-04-02T10:30:00.000Z",
+      },
+      fixedMessageOptions,
+    );
+
+    expect(message).toMatchObject({
+      senderId: "user_echo_321",
+      timestamp: "2026-04-02T10:30:00.000Z",
+      origin: "realtime",
+      attachment: {
+        fileName: "voice-note.webm",
+        originalName: "voice-note.webm",
+        type: "audio",
       },
     });
   });
