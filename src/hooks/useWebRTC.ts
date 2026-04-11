@@ -131,7 +131,7 @@ export function useWebRTC() {
             removePeer(peerId);
             // If the mesh is empty now, clear the call state entirely
             if (peersRef.current.size === 0) {
-              dispatch(clearCall());
+              dispatch(clearCall(undefined));
             }
           },
         );
@@ -275,7 +275,7 @@ export function useWebRTC() {
 
           // If nobody else is left, clear the call locally
           if (peersRef.current.size === 0) {
-            dispatch(clearCall());
+            dispatch(clearCall(undefined));
             setLocalStream((prev) => {
               if (prev) prev.getTracks().forEach((t) => t.stop());
               return null;
@@ -397,7 +397,7 @@ export function useWebRTC() {
       action: SignalCallAction.REJECT,
       data: { type: "offer", sdp: encodeSignal("*", "REJECT") },
     });
-    dispatch(clearCall());
+    dispatch(clearCall(undefined));
   };
 
   const hangUp = async () => {
@@ -406,7 +406,7 @@ export function useWebRTC() {
       data: { type: "offer", sdp: encodeSignal("*", "HANGUP") },
     });
     peersRef.current.forEach((_, peerId) => removePeer(peerId));
-    dispatch(clearCall());
+    dispatch(clearCall(undefined));
     setLocalStream((prev) => {
       if (prev) prev.getTracks().forEach((t) => t.stop());
       return null;
