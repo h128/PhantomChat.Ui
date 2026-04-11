@@ -23,13 +23,13 @@ import type {
   UserEnteredPayload,
 } from "../services/socket/types";
 import { decryptMessage, isEncryptedMessageEnvelope } from "../services/crypto";
-import { useNotificationSound } from "./useNotificationSound";
+import { useMessageNotifications } from "./useBrowserNotifications";
 
 export function useChatSocketBridge() {
   const dispatch = useDispatch();
   const activeRoomId = useSelector(selectActiveRoomId);
   const roomKey = useSelector(selectRoomKey);
-  const playBeep = useNotificationSound();
+  const { notifyIncomingMessage } = useMessageNotifications();
 
   useSocketEvent("NewMessageReceived", async (payload: NewMessagePayload) => {
     const decryptedBody = await resolveIncomingMessageBody(
@@ -48,13 +48,16 @@ export function useChatSocketBridge() {
       return;
     }
 
+    const roomId = resolveMessageRoomId(payload.room_name, activeRoomId);
+
     dispatch(
       messageReceived({
-        roomId: resolveMessageRoomId(payload.room_name, activeRoomId),
+        roomId,
         message,
       }),
     );
-    playBeep();
+
+    void notifyIncomingMessage(roomId, message);
   });
 
   useSocketEvent("UserEnteredRoom", (payload: UserEnteredPayload) => {
@@ -85,7 +88,6 @@ export function useChatSocketBridge() {
         message,
       }),
     );
-    playBeep();
   });
 
   useSocketEvent("LeaveRoom", (payload) => {
@@ -99,7 +101,10 @@ export function useChatSocketBridge() {
 
   useSocketEvent("FileUploaded", (payload: FileUploadedPayload) => {
     const currentUserId = getPersistentUserId();
-    if (payload.user_uuid === currentUserId) return;
+
+    if (payload.user_uuid === currentUserId) {
+      return;
+    }
 
     const message = createChatMessageFromFileUploadedPayload(payload, {
       origin: "realtime",
@@ -109,13 +114,15 @@ export function useChatSocketBridge() {
       return;
     }
 
-    playBeep();
+    const roomId = resolveMessageRoomId(payload.room_name, activeRoomId);
 
     dispatch(
       fileMessageReceived({
-        roomId: resolveMessageRoomId(payload.room_name, activeRoomId),
+        roomId,
         message,
       }),
     );
+
+    void notifyIncomingMessage(roomId, message);
   });
 }

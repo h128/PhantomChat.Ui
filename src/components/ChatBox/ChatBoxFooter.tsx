@@ -145,7 +145,6 @@ export function ChatBoxFooter() {
 
     const userId = getPersistentUserId();
 
-    // 1. Optimistic Update (Local UI)
     dispatch(
       addMessage({
         roomId: activeRoomId,
@@ -204,6 +203,7 @@ export function ChatBoxFooter() {
     const userId = getPersistentUserId();
 
     setIsUploading(true);
+
     processFileUpload(file, roomKey, activeRoomId, userId)
       .then((attachment) => {
         dispatch(
