@@ -65,8 +65,8 @@ export function useMessageNotifications() {
       const roomMember = membersByRoom[roomId]?.[message.senderId];
       const senderLabel =
         roomMember?.displayName?.trim() ||
-        message.senderId ||
-        message.senderName;
+        message.senderName ||
+        message.senderId;
       const avatarUrl = getAvatarById(roomMember?.avatarId)?.src ?? null;
 
       if (
