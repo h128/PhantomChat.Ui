@@ -3,10 +3,12 @@ import { toast } from "sonner";
 import { useAppDispatch, useAppSelector } from "../app/hooks";
 import {
   clearCall,
+  selectActiveRoomId,
   selectCallState,
   setCallStatus,
 } from "../features/chat/chatSlice";
 import { useSocketCommand, useSocketEvent } from "./useSocket";
+import { useCallNotifications } from "./useBrowserNotifications";
 import {
   SignalCallAction,
   SocketCommands,
@@ -51,6 +53,8 @@ function decodeSignal(payload?: string) {
 export function useWebRTC() {
   const dispatch = useAppDispatch();
   const callState = useAppSelector(selectCallState);
+  const activeRoomId = useAppSelector(selectActiveRoomId);
+  const { notifyIncomingCall } = useCallNotifications();
   const sendCommand = useSocketCommand();
   const sendCommandRef = useRef(sendCommand);
   useEffect(() => {
@@ -142,7 +146,7 @@ export function useWebRTC() {
       }
       return webrtc;
     },
-    [dispatch],
+    [dispatch, removePeer],
   );
 
   const drainPendingCandidates = useCallback(
@@ -187,6 +191,11 @@ export function useWebRTC() {
                 }),
               );
               startRinging();
+              void notifyIncomingCall({
+                callerUserId: sender_uuid,
+                roomId: activeRoomId,
+                callType: isVideo ? "video" : "voice",
+              });
             } else if (
               (callState.status === "connected" ||
                 callState.status === "calling") &&
@@ -287,10 +296,12 @@ export function useWebRTC() {
     },
     [
       callState.status,
+      activeRoomId,
       localStream,
       dispatch,
       createPeer,
       drainPendingCandidates,
+      notifyIncomingCall,
       removePeer,
     ],
   );

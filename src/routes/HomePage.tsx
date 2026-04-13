@@ -230,8 +230,8 @@ export function HomePage() {
                   >
                     Room name
                   </label>
-
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+ 
+                  <div className="flex items-center gap-3 sm:gap-4">
                     <MeetingNameInput
                       id="room-name"
                       value={roomName}
@@ -242,7 +242,6 @@ export function HomePage() {
                       autoCapitalize="off"
                       spellCheck={false}
                       className={clsx(
-                        "flex-1",
                         isDark &&
                           "border-slate-800 bg-slate-900/80 text-white placeholder:text-slate-500 focus:border-sky-400/60 focus:bg-slate-950 focus:ring-sky-400/10 focus:text-black",
                       )}
@@ -252,7 +251,6 @@ export function HomePage() {
                       type="submit"
                       disabled={!canContinue}
                       className={clsx(
-                        "sm:w-36",
                         isDark
                           ? "bg-sky-400 text-slate-950 shadow-[0_16px_40px_rgba(56,189,248,0.2)] hover:bg-sky-300 disabled:bg-slate-800 disabled:text-slate-500 disabled:shadow-none"
                           : "bg-[#3390ec] text-white shadow-[0_16px_40px_rgba(51,144,236,0.24)] hover:bg-[#2b82d9] disabled:bg-[#dce9f6] disabled:text-[#8fa7be] disabled:shadow-none",

@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fileMessageReceived,
@@ -23,99 +24,123 @@ import type {
   UserEnteredPayload,
 } from "../services/socket/types";
 import { decryptMessage, isEncryptedMessageEnvelope } from "../services/crypto";
-import { useNotificationSound } from "./useNotificationSound";
+import { useMessageNotifications } from "./useBrowserNotifications";
 
 export function useChatSocketBridge() {
   const dispatch = useDispatch();
   const activeRoomId = useSelector(selectActiveRoomId);
   const roomKey = useSelector(selectRoomKey);
-  const playBeep = useNotificationSound();
+  const { notifyIncomingMessage } = useMessageNotifications();
 
-  useSocketEvent("NewMessageReceived", async (payload: NewMessagePayload) => {
-    const decryptedBody = await resolveIncomingMessageBody(
-      payload.message ?? "",
-      roomKey,
-      decryptMessage,
-      isEncryptedMessageEnvelope,
-    );
+  const handleNewMessageReceived = useCallback(
+    async (payload: NewMessagePayload) => {
+      const decryptedBody = await resolveIncomingMessageBody(
+        payload.message ?? "",
+        roomKey,
+        decryptMessage,
+        isEncryptedMessageEnvelope,
+      );
 
-    const message = createChatMessageFromNewMessagePayload(
-      { ...payload, message: decryptedBody },
-      { origin: "realtime" },
-    );
+      const message = createChatMessageFromNewMessagePayload(
+        { ...payload, message: decryptedBody },
+        { origin: "realtime" },
+      );
 
-    if (!message) {
-      return;
-    }
+      if (!message) {
+        return;
+      }
 
-    dispatch(
-      messageReceived({
-        roomId: resolveMessageRoomId(payload.room_name, activeRoomId),
-        message,
-      }),
-    );
-    playBeep();
-  });
+      const roomId = resolveMessageRoomId(payload.room_name, activeRoomId);
 
-  useSocketEvent("UserEnteredRoom", (payload: UserEnteredPayload) => {
-    const currentUserId = getPersistentUserId();
+      dispatch(
+        messageReceived({
+          roomId,
+          message,
+        }),
+      );
 
-    dispatch(
-      upsertRoomMember({
-        roomId: payload.room_name || activeRoomId || "general",
-        member: toRoomMember(payload),
-      }),
-    );
+      void notifyIncomingMessage(roomId, message);
+    },
+    [activeRoomId, dispatch, notifyIncomingMessage, roomKey],
+  );
 
-    const message = createSystemMessageFromUserEnteredPayload(
-      payload,
-      currentUserId,
-      {
+  const handleUserEnteredRoom = useCallback(
+    (payload: UserEnteredPayload) => {
+      const currentUserId = getPersistentUserId();
+
+      dispatch(
+        upsertRoomMember({
+          roomId: payload.room_name || activeRoomId || "general",
+          member: toRoomMember(payload),
+        }),
+      );
+
+      const message = createSystemMessageFromUserEnteredPayload(
+        payload,
+        currentUserId,
+        {
+          origin: "realtime",
+        },
+      );
+
+      if (!message) {
+        return;
+      }
+
+      dispatch(
+        messageReceived({
+          roomId: resolveMessageRoomId(payload.room_name, activeRoomId),
+          message,
+        }),
+      );
+    },
+    [activeRoomId, dispatch],
+  );
+
+  const handleLeaveRoom = useCallback(
+    (payload: { user_uuid: string }) => {
+      dispatch(
+        removeRoomMember({
+          roomId: activeRoomId || "general",
+          userId: payload.user_uuid,
+        }),
+      );
+    },
+    [activeRoomId, dispatch],
+  );
+
+  const handleFileUploaded = useCallback(
+    (payload: FileUploadedPayload) => {
+      const currentUserId = getPersistentUserId();
+
+      if (payload.user_uuid === currentUserId) {
+        return;
+      }
+
+      const message = createChatMessageFromFileUploadedPayload(payload, {
         origin: "realtime",
-      },
-    );
+      });
 
-    if (!message) {
-      return;
-    }
+      if (!message) {
+        return;
+      }
 
-    dispatch(
-      messageReceived({
-        roomId: resolveMessageRoomId(payload.room_name, activeRoomId),
-        message,
-      }),
-    );
-    playBeep();
-  });
+      const roomId = resolveMessageRoomId(payload.room_name, activeRoomId);
 
-  useSocketEvent("LeaveRoom", (payload) => {
-    dispatch(
-      removeRoomMember({
-        roomId: activeRoomId || "general",
-        userId: payload.user_uuid,
-      }),
-    );
-  });
+      dispatch(
+        fileMessageReceived({
+          roomId,
+          message,
+        }),
+      );
 
-  useSocketEvent("FileUploaded", (payload: FileUploadedPayload) => {
-    const currentUserId = getPersistentUserId();
-    if (payload.user_uuid === currentUserId) return;
+      void notifyIncomingMessage(roomId, message);
+    },
+    [activeRoomId, dispatch, notifyIncomingMessage],
+  );
 
-    const message = createChatMessageFromFileUploadedPayload(payload, {
-      origin: "realtime",
-    });
-
-    if (!message) {
-      return;
-    }
-
-    playBeep();
-
-    dispatch(
-      fileMessageReceived({
-        roomId: resolveMessageRoomId(payload.room_name, activeRoomId),
-        message,
-      }),
-    );
-  });
+  useSocketEvent("NewMessageReceived", handleNewMessageReceived);
+  useSocketEvent("UserEnteredRoom", handleUserEnteredRoom);
+  useSocketEvent("LeaveRoom", handleLeaveRoom);
+  useSocketEvent("FileUploaded", handleFileUploaded);
 }

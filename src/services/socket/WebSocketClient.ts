@@ -48,8 +48,7 @@ export class WebSocketClient {
       this.ws.onmessage = this.handleMessage.bind(this);
       this.ws.onclose = this.handleClose.bind(this);
       this.ws.onerror = this.handleError.bind(this);
-    } catch (err) {
-      console.error("Failed to construct WebSocket:", err);
+    } catch {
       this.updateState("error");
       this.triggerReconnect();
     }
@@ -92,9 +91,6 @@ export class WebSocketClient {
       command,
       ...payload,
     };
-
-    console.debug(`[WS] Outgoing Payload:`);
-    console.table(request);
 
     return new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => {
@@ -151,11 +147,6 @@ export class WebSocketClient {
   private handleMessage(messageEvent: MessageEvent) {
     try {
       const data = JSON.parse(messageEvent.data);
-      console.log(
-        `%c[WS] Raw Incoming ->`,
-        "color: #3b82f6; font-weight: bold",
-        data,
-      );
 
       // Handle PONGs (if server ever sends them unexpectedly)
       if (data.command === 0 || data.type === "pong") {
@@ -181,8 +172,6 @@ export class WebSocketClient {
         }
         return;
       }
-
-      console.debug(`[WS] Unmatched Server Msg ->`, data);
 
       // Discriminator: Push Events (Explicit event_name)
       if (data.event_name) {

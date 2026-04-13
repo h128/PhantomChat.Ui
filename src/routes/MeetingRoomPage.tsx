@@ -1,5 +1,6 @@
 import clsx from "clsx";
 import {
+  Bell,
   ChevronDown,
   LogOut,
   Mic,
@@ -35,6 +36,7 @@ import {
 } from "../features/profile/profileSlice";
 import { selectResolvedTheme } from "../features/theme/themeSlice";
 import { useSocketCommand, useSocketState } from "../hooks/useSocket";
+import { useNotificationPermission } from "../hooks/useBrowserNotifications";
 import { useWebRTC } from "../hooks/useWebRTC";
 import { decryptRoomKey, getPublicKeyHex } from "../services/crypto";
 import { fetchRoomHistory } from "../services/chatHistory";
@@ -108,18 +110,11 @@ async function joinRoom(
       dispatch(setRoomInfo({ key: roomKey, status: "joined" }));
 
       toast.success(`Joined ${displayRoomName}`);
-      console.log(
-        `[MeetingRoom] Successfully initialized and joined: ${normalizedRoomName}`,
-      );
       return { roomCreated: response.room_created };
     } else if (
       retryOnConflict &&
       message.toLowerCase().includes("already in another room")
     ) {
-      console.warn(
-        "[MeetingRoom] User already in another room. Forcing leave and retry...",
-      );
-
       await sendCommand(SocketCommands.LEAVE_ROOM, {
         room_name: normalizedRoomName,
       }).catch(() => {});
@@ -225,6 +220,8 @@ export function MeetingRoomPage() {
   const sendCommand = useSocketCommand();
   const socketState = useSocketState(); // Track connection state
   const chatState = useAppSelector((state) => state.chat);
+  const { supported, canRequestPermission, requestPermission } =
+    useNotificationPermission();
   const {
     callState,
     startCall,
@@ -274,6 +271,22 @@ export function MeetingRoomPage() {
       replace: true,
     });
   }, [isProfileComplete, navigate, normalizedRoomName]);
+
+  const handleEnableNotifications = async () => {
+    const permission = await requestPermission();
+
+    if (permission === "granted") {
+      toast.success("System notifications enabled.");
+      return;
+    }
+
+    if (permission === "denied") {
+      toast.error("Notifications are blocked. Enable them from your browser site settings.");
+      return;
+    }
+
+    toast.message("Notification permission was dismissed.");
+  };
 
   // 1. Immediate sync of activeRoomId and Join Room
   useEffect(() => {
@@ -466,6 +479,22 @@ export function MeetingRoomPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            {supported && canRequestPermission && (
+              <button
+                type="button"
+                onClick={handleEnableNotifications}
+                className={clsx(
+                  "inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium transition-all hover:scale-[1.02] active:scale-[0.98]",
+                  isDark
+                    ? "bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
+                    : "bg-amber-100 text-amber-700 hover:bg-amber-200",
+                )}
+                title="Enable system notifications"
+              >
+                <Bell size={16} />
+                Enable alerts
+              </button>
+            )}
             {chatState.roomStatus === "joined" &&
               callState.status === "idle" && (
                 <>

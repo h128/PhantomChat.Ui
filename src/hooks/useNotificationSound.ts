@@ -1,4 +1,5 @@
 import { useCallback, useRef } from "react";
+import { getAppActivityState } from "../services/browserNotifications";
 
 const BEEP_FREQUENCY = 660;
 const BEEP_DURATION = 0.15;
@@ -13,15 +14,15 @@ function getAudioContext(): AudioContext {
   return audioContext;
 }
 
-function isTabHidden(): boolean {
-  return document.hidden;
+function shouldPlayFallbackSound(): boolean {
+  return getAppActivityState() !== "active";
 }
 
 export function useNotificationSound() {
   const lastPlayedRef = useRef(0);
 
   const playBeep = useCallback(() => {
-    if (!isTabHidden()) return;
+    if (!shouldPlayFallbackSound()) return;
 
     // Throttle: don't beep more than once per second
     const now = Date.now();

@@ -10,6 +10,7 @@ import { selectResolvedTheme } from "./features/theme/themeSlice";
 import "./index.css";
 import "./utils/datetime";
 import { Tolgee, DevTools, TolgeeProvider, FormatSimple } from "@tolgee/react";
+import { registerChatNotificationServiceWorker } from "./services/browserNotifications";
 
 const tolgee = Tolgee()
   .use(DevTools())
@@ -22,6 +23,10 @@ const tolgee = Tolgee()
   });
 
 applyThemeToDocument(selectResolvedTheme(store.getState()));
+
+void registerChatNotificationServiceWorker().catch((error) => {
+  console.error("Failed to register chat notification service worker:", error);
+});
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
