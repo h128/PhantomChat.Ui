@@ -24,7 +24,9 @@ const tolgee = Tolgee()
 
 applyThemeToDocument(selectResolvedTheme(store.getState()));
 
-void registerChatNotificationServiceWorker();
+void registerChatNotificationServiceWorker().catch((error) => {
+  console.error("Failed to register chat notification service worker:", error);
+});
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
