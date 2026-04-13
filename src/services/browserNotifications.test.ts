@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createIncomingCallBody,
   createIncomingCallTitle,
@@ -14,6 +14,10 @@ import {
 } from "./browserNotifications";
 
 describe("browserNotifications", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("derives app activity state from document visibility and focus", () => {
     expect(
       getAppActivityState({
@@ -130,29 +134,14 @@ describe("browserNotifications", () => {
       showNotification: vi.fn().mockResolvedValue(undefined),
     };
 
-    const originalNotification = globalThis.Notification;
-    const originalNavigator = globalThis.navigator;
-    const originalWindow = globalThis.window;
-
-    Object.defineProperty(globalThis, "Notification", {
-      configurable: true,
-      value: { permission: "granted" },
+    vi.stubGlobal("Notification", { permission: "granted" });
+    vi.stubGlobal("window", {
+      Notification: globalThis.Notification,
     });
-
-    Object.defineProperty(globalThis, "window", {
-      configurable: true,
-      value: {
-        Notification: globalThis.Notification,
-      },
-    });
-
-    Object.defineProperty(globalThis, "navigator", {
-      configurable: true,
-      value: {
-        serviceWorker: {
-          register: vi.fn().mockResolvedValue(notificationSpy),
-          getRegistration: vi.fn().mockResolvedValue(notificationSpy),
-        },
+    vi.stubGlobal("navigator", {
+      serviceWorker: {
+        register: vi.fn().mockResolvedValue(notificationSpy),
+        getRegistration: vi.fn().mockResolvedValue(notificationSpy),
       },
     });
 
@@ -175,60 +164,17 @@ describe("browserNotifications", () => {
         icon: "/avatar-alpha.svg",
       }),
     );
-
-    Object.defineProperty(globalThis, "Notification", {
-      configurable: true,
-      value: originalNotification,
-    });
-
-    Object.defineProperty(globalThis, "navigator", {
-      configurable: true,
-      value: originalNavigator,
-    });
-
-    Object.defineProperty(globalThis, "window", {
-      configurable: true,
-      value: originalWindow,
-    });
   });
 
   it("falls back to Notification support when service workers are unavailable", () => {
-    const originalNavigator = globalThis.navigator;
-    const originalWindow = globalThis.window;
-    const originalNotification = globalThis.Notification;
-
-    Object.defineProperty(globalThis, "Notification", {
-      configurable: true,
-      value: { permission: "default" },
+    vi.stubGlobal("Notification", { permission: "default" });
+    vi.stubGlobal("window", {
+      Notification: globalThis.Notification,
     });
-
-    Object.defineProperty(globalThis, "window", {
-      configurable: true,
-      value: {
-        Notification: globalThis.Notification,
-      },
-    });
-
-    Object.defineProperty(globalThis, "navigator", {
-      configurable: true,
-      value: {},
-    });
+    vi.stubGlobal("navigator", {});
 
     expect(isNotificationSupported()).toBe(true);
     expect(isServiceWorkerNotificationSupported()).toBe(false);
-
-    Object.defineProperty(globalThis, "Notification", {
-      configurable: true,
-      value: originalNotification,
-    });
-    Object.defineProperty(globalThis, "window", {
-      configurable: true,
-      value: originalWindow,
-    });
-    Object.defineProperty(globalThis, "navigator", {
-      configurable: true,
-      value: originalNavigator,
-    });
   });
 
   it("shows incoming call notifications through the service worker when available", async () => {
@@ -236,29 +182,14 @@ describe("browserNotifications", () => {
       showNotification: vi.fn().mockResolvedValue(undefined),
     };
 
-    const originalNotification = globalThis.Notification;
-    const originalNavigator = globalThis.navigator;
-    const originalWindow = globalThis.window;
-
-    Object.defineProperty(globalThis, "Notification", {
-      configurable: true,
-      value: { permission: "granted" },
+    vi.stubGlobal("Notification", { permission: "granted" });
+    vi.stubGlobal("window", {
+      Notification: globalThis.Notification,
     });
-
-    Object.defineProperty(globalThis, "window", {
-      configurable: true,
-      value: {
-        Notification: globalThis.Notification,
-      },
-    });
-
-    Object.defineProperty(globalThis, "navigator", {
-      configurable: true,
-      value: {
-        serviceWorker: {
-          register: vi.fn().mockResolvedValue(notificationSpy),
-          getRegistration: vi.fn().mockResolvedValue(notificationSpy),
-        },
+    vi.stubGlobal("navigator", {
+      serviceWorker: {
+        register: vi.fn().mockResolvedValue(notificationSpy),
+        getRegistration: vi.fn().mockResolvedValue(notificationSpy),
       },
     });
 
@@ -276,20 +207,5 @@ describe("browserNotifications", () => {
         icon: "/avatar-alpha.svg",
       }),
     );
-
-    Object.defineProperty(globalThis, "Notification", {
-      configurable: true,
-      value: originalNotification,
-    });
-
-    Object.defineProperty(globalThis, "navigator", {
-      configurable: true,
-      value: originalNavigator,
-    });
-
-    Object.defineProperty(globalThis, "window", {
-      configurable: true,
-      value: originalWindow,
-    });
   });
 });
