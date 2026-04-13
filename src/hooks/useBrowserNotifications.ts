@@ -2,11 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import type { ChatMessage } from "../features/chat/chatSlice";
 import { useAppSelector } from "../app/hooks";
 import { getAvatarById } from "../features/profile/avatarCatalog";
+import { selectActiveRoomId } from "../features/chat/chatSlice";
 import {
   getAppActivityState,
   getNotificationPermissionState,
   isNotificationSupported,
   requestBrowserNotificationPermission,
+  showIncomingCallNotification,
+  shouldNotifyForIncomingCall,
   shouldNotifyForIncomingMessage,
   showChatNotification,
   type NotificationPermissionState,
@@ -81,7 +84,6 @@ export function useMessageNotifications() {
         message,
         senderLabel,
         iconUrl: avatarUrl,
-        imageUrl: avatarUrl,
       }).catch(() => false);
 
       if (!shown) {
@@ -92,4 +94,57 @@ export function useMessageNotifications() {
   );
 
   return { notifyIncomingMessage };
+}
+
+export function useCallNotifications() {
+  const playBeep = useNotificationSound();
+  const activeRoomId = useAppSelector(selectActiveRoomId);
+  const membersByRoom = useAppSelector((state) => state.chat.membersByRoom);
+
+  const notifyIncomingCall = useCallback(
+    async ({
+      callerUserId,
+      roomId = activeRoomId,
+      callType,
+    }: {
+      callerUserId: string;
+      roomId?: string;
+      callType: "video" | "voice";
+    }) => {
+      const currentUserId = getPersistentUserId();
+      const appActivityState = getAppActivityState();
+
+      if (
+        !shouldNotifyForIncomingCall({
+          callerUserId,
+          currentUserId,
+          appActivityState,
+        })
+      ) {
+        return;
+      }
+
+      const resolvedRoomId = roomId || activeRoomId;
+      const roomMember = resolvedRoomId
+        ? membersByRoom[resolvedRoomId]?.[callerUserId]
+        : undefined;
+      const callerLabel =
+        roomMember?.displayName?.trim() || callerUserId;
+      const avatarUrl = getAvatarById(roomMember?.avatarId)?.src ?? null;
+
+      const shown = await showIncomingCallNotification({
+        roomId: resolvedRoomId || "room",
+        callerLabel,
+        callType,
+        iconUrl: avatarUrl,
+      }).catch(() => false);
+
+      if (!shown) {
+        playBeep();
+      }
+    },
+    [activeRoomId, membersByRoom, playBeep],
+  );
+
+  return { notifyIncomingCall };
 }

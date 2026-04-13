@@ -1,9 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  createIncomingCallBody,
+  createIncomingCallTitle,
   createNotificationBody,
   createNotificationTitle,
   getAppActivityState,
+  isNotificationSupported,
+  isServiceWorkerNotificationSupported,
   showChatNotification,
+  showIncomingCallNotification,
+  shouldNotifyForIncomingCall,
   shouldNotifyForIncomingMessage,
 } from "./browserNotifications";
 
@@ -32,6 +38,24 @@ describe("browserNotifications", () => {
         hasFocus: () => false,
       }),
     ).toBe("hidden");
+  });
+
+  it("treats call notifications the same way as messages for active vs hidden pages", () => {
+    expect(
+      shouldNotifyForIncomingCall({
+        callerUserId: "user_alpha_123",
+        currentUserId: "user_self_123",
+        appActivityState: "active",
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldNotifyForIncomingCall({
+        callerUserId: "user_alpha_123",
+        currentUserId: "user_self_123",
+        appActivityState: "hidden",
+      }),
+    ).toBe(true);
   });
 
   it("only notifies for non-system messages when the app is not active", () => {
@@ -77,8 +101,12 @@ describe("browserNotifications", () => {
   });
 
   it("creates readable notification titles and bodies", () => {
-    expect(createNotificationTitle("signal-lab", "Alpha")).toBe(
+    expect(createNotificationTitle("Alpha")).toBe(
       "Alpha",
+    );
+    expect(createIncomingCallTitle("Alpha")).toBe("Alpha is calling");
+    expect(createIncomingCallBody("video")).toBe(
+      "Incoming video call",
     );
 
     expect(
@@ -132,7 +160,6 @@ describe("browserNotifications", () => {
       roomId: "signal-lab",
       senderLabel: "Alpha",
       iconUrl: "/avatar-alpha.svg",
-      imageUrl: "/avatar-alpha.svg",
       message: {
         id: "msg-3",
         senderId: "user_alpha_123",
@@ -146,7 +173,107 @@ describe("browserNotifications", () => {
       "Alpha",
       expect.objectContaining({
         icon: "/avatar-alpha.svg",
-        image: "/avatar-alpha.svg",
+      }),
+    );
+
+    Object.defineProperty(globalThis, "Notification", {
+      configurable: true,
+      value: originalNotification,
+    });
+
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: originalNavigator,
+    });
+
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: originalWindow,
+    });
+  });
+
+  it("falls back to Notification support when service workers are unavailable", () => {
+    const originalNavigator = globalThis.navigator;
+    const originalWindow = globalThis.window;
+    const originalNotification = globalThis.Notification;
+
+    Object.defineProperty(globalThis, "Notification", {
+      configurable: true,
+      value: { permission: "default" },
+    });
+
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        Notification: globalThis.Notification,
+      },
+    });
+
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: {},
+    });
+
+    expect(isNotificationSupported()).toBe(true);
+    expect(isServiceWorkerNotificationSupported()).toBe(false);
+
+    Object.defineProperty(globalThis, "Notification", {
+      configurable: true,
+      value: originalNotification,
+    });
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: originalWindow,
+    });
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: originalNavigator,
+    });
+  });
+
+  it("shows incoming call notifications through the service worker when available", async () => {
+    const notificationSpy = {
+      showNotification: vi.fn().mockResolvedValue(undefined),
+    };
+
+    const originalNotification = globalThis.Notification;
+    const originalNavigator = globalThis.navigator;
+    const originalWindow = globalThis.window;
+
+    Object.defineProperty(globalThis, "Notification", {
+      configurable: true,
+      value: { permission: "granted" },
+    });
+
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        Notification: globalThis.Notification,
+      },
+    });
+
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: {
+        serviceWorker: {
+          register: vi.fn().mockResolvedValue(notificationSpy),
+          getRegistration: vi.fn().mockResolvedValue(notificationSpy),
+        },
+      },
+    });
+
+    await showIncomingCallNotification({
+      roomId: "signal-lab",
+      callerLabel: "Alpha",
+      callType: "voice",
+      iconUrl: "/avatar-alpha.svg",
+    });
+
+    expect(notificationSpy.showNotification).toHaveBeenCalledWith(
+      "Alpha is calling",
+      expect.objectContaining({
+        body: "Incoming voice call",
+        icon: "/avatar-alpha.svg",
       }),
     );
 

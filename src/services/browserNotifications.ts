@@ -11,26 +11,152 @@ type ChatNotificationInput = {
   message: ChatMessage;
   senderLabel?: string;
   iconUrl?: string | null;
-  imageUrl?: string | null;
+};
+
+type IncomingCallNotificationInput = {
+  roomId: string;
+  callerLabel: string;
+  callType: "video" | "voice";
+  iconUrl?: string | null;
 };
 
 const SERVICE_WORKER_PATH = "/chat-notifications-sw.js";
 const CHAT_ICON_PATH = "/comment.png";
 
 let registrationPromise: Promise<ServiceWorkerRegistration | null> | null = null;
+let activityTrackingInitialized = false;
+let trackedWindowFocused = true;
+let trackedPageHidden = false;
 
-function formatRoomName(value: string) {
-  return value
-    .split("-")
-    .filter(Boolean)
-    .map((segment) => segment[0]?.toUpperCase() + segment.slice(1))
-    .join(" ");
+function canUseDom() {
+  return typeof window !== "undefined" && typeof document !== "undefined";
+}
+
+function syncTrackedActivityState() {
+  if (!canUseDom()) {
+    return;
+  }
+
+  trackedPageHidden =
+    document.hidden || document.visibilityState === "hidden";
+  trackedWindowFocused =
+    typeof document.hasFocus === "function" ? document.hasFocus() : true;
+}
+
+function ensureAppActivityTracking() {
+  if (activityTrackingInitialized || !canUseDom()) {
+    return;
+  }
+
+  activityTrackingInitialized = true;
+  syncTrackedActivityState();
+
+  window.addEventListener("focus", () => {
+    trackedWindowFocused = true;
+    syncTrackedActivityState();
+  });
+
+  window.addEventListener("blur", () => {
+    trackedWindowFocused = false;
+    syncTrackedActivityState();
+  });
+
+  window.addEventListener("pagehide", () => {
+    trackedPageHidden = true;
+  });
+
+  window.addEventListener("pageshow", () => {
+    syncTrackedActivityState();
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    syncTrackedActivityState();
+  });
+}
+
+function buildNotificationOptions({
+  body,
+  tag,
+  targetUrl,
+  iconUrl,
+  data,
+}: {
+  body: string;
+  tag: string;
+  targetUrl: string;
+  iconUrl?: string | null;
+  data?: Record<string, unknown>;
+}) {
+  const resolvedIconUrl = iconUrl || CHAT_ICON_PATH;
+
+  return {
+    body,
+    tag,
+    icon: resolvedIconUrl,
+    badge: CHAT_ICON_PATH,
+    data: {
+      url: targetUrl,
+      ...(data ?? {}),
+    },
+  };
+}
+
+async function showSystemNotification({
+  title,
+  body,
+  tag,
+  targetUrl,
+  iconUrl,
+  data,
+}: {
+  title: string;
+  body: string;
+  tag: string;
+  targetUrl: string;
+  iconUrl?: string | null;
+  data?: Record<string, unknown>;
+}) {
+  if (getNotificationPermissionState() !== "granted") {
+    return false;
+  }
+
+  const options = buildNotificationOptions({
+    body,
+    tag,
+    targetUrl,
+    iconUrl,
+    data,
+  });
+
+  if (isServiceWorkerNotificationSupported()) {
+    const registration =
+      (await navigator.serviceWorker.getRegistration().catch(() => undefined)) ||
+      (await registerChatNotificationServiceWorker().catch(() => null));
+
+    if (registration?.showNotification) {
+      await registration.showNotification(title, options);
+      return true;
+    }
+  }
+
+  if (typeof Notification !== "undefined") {
+    new Notification(title, options);
+    return true;
+  }
+
+  return false;
 }
 
 export function isNotificationSupported() {
   return (
     typeof window !== "undefined" &&
-    "Notification" in window &&
+    "Notification" in window
+  );
+}
+
+export function isServiceWorkerNotificationSupported() {
+  return (
+    isNotificationSupported() &&
     typeof navigator !== "undefined" &&
     "serviceWorker" in navigator
   );
@@ -47,11 +173,28 @@ export function getNotificationPermissionState(): NotificationPermissionState {
 export function getAppActivityState(
   doc: Pick<Document, "hidden" | "visibilityState" | "hasFocus"> = document,
 ): AppActivityState {
-  if (doc.hidden || doc.visibilityState === "hidden") {
+  if (canUseDom() && doc === document) {
+    ensureAppActivityTracking();
+  }
+
+  const pageHidden =
+    canUseDom() && doc === document
+      ? trackedPageHidden
+      : doc.hidden || doc.visibilityState === "hidden";
+
+  if (pageHidden) {
     return "hidden";
   }
 
-  if (typeof doc.hasFocus === "function" && !doc.hasFocus()) {
+  const isFocused =
+    canUseDom() && doc === document
+      ? trackedWindowFocused &&
+        (typeof doc.hasFocus !== "function" || doc.hasFocus())
+      : typeof doc.hasFocus === "function"
+        ? doc.hasFocus()
+        : true;
+
+  if (!isFocused) {
     return "inactive";
   }
 
@@ -78,6 +221,22 @@ export function shouldNotifyForIncomingMessage({
   return true;
 }
 
+export function shouldNotifyForIncomingCall({
+  callerUserId,
+  currentUserId,
+  appActivityState,
+}: {
+  callerUserId: string;
+  currentUserId: string;
+  appActivityState: AppActivityState;
+}) {
+  if (appActivityState === "active") {
+    return false;
+  }
+
+  return callerUserId !== currentUserId;
+}
+
 export function createNotificationBody(message: ChatMessage) {
   if (message.content.trim()) {
     return message.content;
@@ -95,13 +254,22 @@ export function createNotificationBody(message: ChatMessage) {
   }
 }
 
-export function createNotificationTitle(roomId: string, senderName: string) {
-//   const roomName = formatRoomName(roomId) || roomId;
+export function createNotificationTitle(senderName: string) {
   return `${senderName}`;
 }
 
+export function createIncomingCallTitle(callerLabel: string) {
+  return `${callerLabel} is calling`;
+}
+
+export function createIncomingCallBody(
+  callType: "video" | "voice",
+) {
+  return `Incoming ${callType} call`;
+}
+
 export async function registerChatNotificationServiceWorker() {
-  if (!isNotificationSupported()) {
+  if (!isServiceWorkerNotificationSupported()) {
     return null;
   }
 
@@ -126,7 +294,10 @@ export async function requestBrowserNotificationPermission() {
     return Notification.permission;
   }
 
-  await registerChatNotificationServiceWorker().catch(() => null);
+  if (isServiceWorkerNotificationSupported()) {
+    await registerChatNotificationServiceWorker().catch(() => null);
+  }
+
   return Notification.requestPermission();
 }
 
@@ -135,53 +306,39 @@ export async function showChatNotification({
   message,
   senderLabel,
   iconUrl,
-  imageUrl,
 }: ChatNotificationInput) {
-  if (getNotificationPermissionState() !== "granted") {
-    return false;
-  }
-
-  const registration =
-    (await registerChatNotificationServiceWorker().catch(() => null)) ||
-    (await navigator.serviceWorker.getRegistration().catch(() => undefined));
-
   const title = createNotificationTitle(
-    roomId,
-    senderLabel || message.senderId || message.senderName,
+    senderLabel || message.senderName || message.senderId,
   );
   const body = createNotificationBody(message);
-  const targetUrl = `/room/${encodeURIComponent(roomId)}`;
-  const resolvedIconUrl = iconUrl || CHAT_ICON_PATH;
+  return showSystemNotification({
+    title,
+    body,
+    tag: `chat:${roomId}:${message.id}`,
+    targetUrl: `/room/${encodeURIComponent(roomId)}`,
+    iconUrl,
+    data: {
+      roomId,
+      messageId: message.id,
+    },
+  });
+}
 
-  if (registration?.showNotification) {
-    await registration.showNotification(title, {
-      body,
-      tag: `chat:${roomId}:${message.id}`,
-      icon: resolvedIconUrl,
-      badge: CHAT_ICON_PATH,
-      ...(imageUrl ? { image: imageUrl } : {}),
-      data: {
-        roomId,
-        url: targetUrl,
-        messageId: message.id,
-      },
-    });
-    return true;
-  }
-
-  if (typeof Notification !== "undefined") {
-    new Notification(title, {
-      body,
-      icon: resolvedIconUrl,
-      tag: `chat:${roomId}:${message.id}`,
-      data: {
-        roomId,
-        url: targetUrl,
-        messageId: message.id,
-      },
-    });
-    return true;
-  }
-
-  return false;
+export async function showIncomingCallNotification({
+  roomId,
+  callerLabel,
+  callType,
+  iconUrl,
+}: IncomingCallNotificationInput) {
+  return showSystemNotification({
+    title: createIncomingCallTitle(callerLabel),
+    body: createIncomingCallBody(callType),
+    tag: `call:${roomId}:${callType}:${callerLabel}`,
+    targetUrl: `/room/${encodeURIComponent(roomId)}`,
+    iconUrl,
+    data: {
+      roomId,
+      callType,
+    },
+  });
 }
