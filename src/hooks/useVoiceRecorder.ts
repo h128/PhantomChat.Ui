@@ -1,7 +1,8 @@
+import { DateTime } from "luxon";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { encryptFile, isEncryptionEnabled } from "../services/crypto";
-import { generateFileName, uploadFile } from "../services/fileUpload";
+import { uploadFile } from "../services/fileUpload";
 import { getPersistentUserId } from "../utils/user";
 
 export type VoiceRecorderState = "idle" | "recording" | "uploading";
@@ -113,7 +114,7 @@ export function useVoiceRecorder({
       chunksRef.current = [];
 
       const userId = getPersistentUserId();
-      const fileName = generateFileName(userId, ext, false);
+      const fileName = `voice_${DateTime.now().toMillis()}.${ext}`;
 
       try {
         const rawBytes = new Uint8Array(await blob.arrayBuffer());

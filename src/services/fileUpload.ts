@@ -3,29 +3,6 @@ const BASE_URL = import.meta.env.VITE_HTTP_URL;
 const THUMBNAIL_MAX_WIDTH = 200;
 
 /**
- * Generates a unique filename for upload.
- * For images, includes "poster" in the name for the original version.
- */
-export function generateFileName(
-  userId: string,
-  extension: string,
-  isPoster: boolean,
-  random?: string,
-): string {
-  const rand = random ?? Math.random().toString(36).substring(2, 8);
-  const posterTag = isPoster ? "_poster" : "";
-  return `${rand}_${userId}${posterTag}.${extension}`;
-}
-
-/**
- * Extracts file extension from a filename.
- */
-export function getExtension(filename: string): string {
-  const dot = filename.lastIndexOf(".");
-  return dot === -1 ? "bin" : filename.substring(dot + 1).toLowerCase();
-}
-
-/**
  * Uploads an encrypted file blob to the server.
  */
 export async function uploadFile(

@@ -156,7 +156,7 @@ export function createChatMessageFromFileUploadedPayload(
   const isImage = /\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(fileName);
   const isAudio = /\.(webm|ogg|mp3|m4a|wav)$/i.test(fileName);
 
-  if (isImage && !payload.poster) {
+  if (fileName.startsWith("thumb_")) {
     return null;
   }
 
@@ -171,7 +171,7 @@ export function createChatMessageFromFileUploadedPayload(
       fileName,
       originalName: fileName,
       type: isImage ? "image" : isAudio ? "audio" : "file",
-      ...(isImage ? { thumbnailFile: fileName.replace("_poster", "") } : {}),
+      ...(isImage ? { thumbnailFile: `thumb_${fileName}` } : {}),
     },
   };
 }
