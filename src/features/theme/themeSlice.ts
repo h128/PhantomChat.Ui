@@ -3,7 +3,7 @@ import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 export type ThemeMode = "system" | "light" | "dark";
 export type ResolvedTheme = Exclude<ThemeMode, "system">;
 
-export const THEME_STORAGE_KEY = "phantomchat.themeMode";
+export const THEME_STORAGE_KEY = "fantomchat.themeMode";
 
 interface ThemeState {
   mode: ThemeMode;

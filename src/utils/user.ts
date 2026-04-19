@@ -1,4 +1,4 @@
-const USER_ID_KEY = "phantomchat_user_uuid";
+const USER_ID_KEY = "fantomchat_user_uuid";
 
 export function deriveDisplayNameFromUserId(userId: string): string {
   if (!userId) return "Unknown";

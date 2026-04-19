@@ -1,6 +1,6 @@
-# PhantomChat.UI
+# FantomChat.UI
 
-Frontend for [PhantomChat](https://github.com/h128/PhantomChat) — a secure, decentralized chat application built around privacy and simplicity. No contact lists, no dashboards, no extra steps. Just a clean place to start chatting.
+Frontend for [FantomChat](https://github.com/h128/PhantomChat) — a secure, decentralized chat application built around privacy and simplicity. No contact lists, no dashboards, no extra steps. Just a clean place to start chatting.
 
 > **Warning:** This project is still under construction and not ready for use or collaboration yet. Please stay tuned.
 

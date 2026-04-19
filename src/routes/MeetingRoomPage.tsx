@@ -462,7 +462,7 @@ export function MeetingRoomPage() {
           >
             <img
               src="/comment.png"
-              alt="PhantomChat logo"
+              alt="FantomChat logo"
               className="h-10 w-10 rounded-2xl object-cover"
             />
             <div className="text-left">
@@ -472,7 +472,7 @@ export function MeetingRoomPage() {
                   isDark ? "text-slate-50" : "text-slate-900",
                 )}
               >
-                PhantomChat
+                FantomChat
               </p>
               <p
                 className={clsx(
