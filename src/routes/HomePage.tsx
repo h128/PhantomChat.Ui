@@ -230,7 +230,7 @@ export function HomePage() {
                   >
                     Room name
                   </label>
- 
+
                   <div className="flex items-center gap-3 sm:gap-4">
                     <MeetingNameInput
                       id="room-name"

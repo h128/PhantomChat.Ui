@@ -3,8 +3,11 @@ import {
   Bell,
   ChevronDown,
   LogOut,
+  Maximize2,
   Mic,
   MicOff,
+  Minimize2,
+  MonitorUp,
   Phone,
   PhoneCall,
   PhoneOff,
@@ -230,6 +233,7 @@ export function MeetingRoomPage() {
     hangUp,
     toggleMicrophone,
     toggleCamera,
+    toggleScreenShare,
     switchDevice,
     getDevices,
     localStream,
@@ -238,6 +242,7 @@ export function MeetingRoomPage() {
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [isCallExpanded, setIsCallExpanded] = useState(false);
   const [availableDevices, setAvailableDevices] = useState<{
     audioInputs: MediaDeviceInfo[];
     videoInputs: MediaDeviceInfo[];
@@ -281,7 +286,9 @@ export function MeetingRoomPage() {
     }
 
     if (permission === "denied") {
-      toast.error("Notifications are blocked. Enable them from your browser site settings.");
+      toast.error(
+        "Notifications are blocked. Enable them from your browser site settings.",
+      );
       return;
     }
 
@@ -558,12 +565,33 @@ export function MeetingRoomPage() {
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
           <div
             className={clsx(
-              "relative flex w-full max-w-2xl flex-col items-center rounded-3xl border p-8 shadow-2xl",
+              "relative flex flex-col items-center rounded-3xl border shadow-2xl transition-all duration-300",
+              isCallExpanded
+                ? "h-[calc(100%-2rem)] w-[calc(100%-2rem)] p-6"
+                : "w-full max-w-2xl p-8",
               isDark
                 ? "border-white/10 bg-slate-900"
                 : "border-slate-200 bg-white",
             )}
           >
+            {/* Expand / Minimize toggle */}
+            <button
+              onClick={() => setIsCallExpanded((prev) => !prev)}
+              className={clsx(
+                "absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-lg transition-all hover:scale-110 active:scale-95",
+                isDark
+                  ? "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200",
+              )}
+              title={isCallExpanded ? "Minimize" : "Expand"}
+            >
+              {isCallExpanded ? (
+                <Minimize2 size={16} />
+              ) : (
+                <Maximize2 size={16} />
+              )}
+            </button>
+
             <div className="mb-6 flex flex-col items-center gap-4">
               <div className="flex h-20 w-20 items-center justify-center rounded-full bg-sky-500/20 text-sky-500">
                 {callState.callType === "video" ? (
@@ -589,6 +617,7 @@ export function MeetingRoomPage() {
               <div
                 className={clsx(
                   "mb-8 grid w-full gap-4",
+                  isCallExpanded && "min-h-0 flex-1",
                   remoteStreams.size === 0
                     ? "grid-cols-1"
                     : remoteStreams.size === 1
@@ -623,6 +652,12 @@ export function MeetingRoomPage() {
                   <div className="absolute bottom-2 left-2 flex items-center gap-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     Local (You)
+                    {callState.screenShareEnabled && (
+                      <span className="flex items-center gap-1 text-sky-400">
+                        <MonitorUp size={10} />
+                        Sharing
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -715,6 +750,25 @@ export function MeetingRoomPage() {
                       )}
                     </button>
                   )}
+
+                  <button
+                    onClick={toggleScreenShare}
+                    className={clsx(
+                      "flex h-12 w-12 items-center justify-center rounded-full transition-all hover:scale-110 active:scale-95",
+                      callState.screenShareEnabled
+                        ? "bg-sky-500 text-white"
+                        : isDark
+                          ? "bg-slate-800 text-slate-200"
+                          : "bg-slate-100 text-slate-700",
+                    )}
+                    title={
+                      callState.screenShareEnabled
+                        ? "Stop Sharing"
+                        : "Share Screen"
+                    }
+                  >
+                    <MonitorUp size={24} />
+                  </button>
 
                   <button
                     onClick={() => setIsSettingsOpen(true)}

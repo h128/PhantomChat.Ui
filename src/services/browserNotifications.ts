@@ -23,7 +23,8 @@ type IncomingCallNotificationInput = {
 const SERVICE_WORKER_PATH = "/chat-notifications-sw.js";
 const CHAT_ICON_PATH = "/comment.png";
 
-let registrationPromise: Promise<ServiceWorkerRegistration | null> | null = null;
+let registrationPromise: Promise<ServiceWorkerRegistration | null> | null =
+  null;
 let activityTrackingInitialized = false;
 let trackedWindowFocused = true;
 let trackedPageHidden = false;
@@ -37,8 +38,7 @@ function syncTrackedActivityState() {
     return;
   }
 
-  trackedPageHidden =
-    document.hidden || document.visibilityState === "hidden";
+  trackedPageHidden = document.hidden || document.visibilityState === "hidden";
   trackedWindowFocused =
     typeof document.hasFocus === "function" ? document.hasFocus() : true;
 }
@@ -130,7 +130,9 @@ async function showSystemNotification({
 
   if (isServiceWorkerNotificationSupported()) {
     const registration =
-      (await navigator.serviceWorker.getRegistration().catch(() => undefined)) ||
+      (await navigator.serviceWorker
+        .getRegistration()
+        .catch(() => undefined)) ||
       (await registerChatNotificationServiceWorker().catch(() => null));
 
     if (registration?.showNotification) {
@@ -148,10 +150,7 @@ async function showSystemNotification({
 }
 
 export function isNotificationSupported() {
-  return (
-    typeof window !== "undefined" &&
-    "Notification" in window
-  );
+  return typeof window !== "undefined" && "Notification" in window;
 }
 
 export function isServiceWorkerNotificationSupported() {
@@ -262,9 +261,7 @@ export function createIncomingCallTitle(callerLabel: string) {
   return `${callerLabel} is calling`;
 }
 
-export function createIncomingCallBody(
-  callType: "video" | "voice",
-) {
+export function createIncomingCallBody(callType: "video" | "voice") {
   return `Incoming ${callType} call`;
 }
 

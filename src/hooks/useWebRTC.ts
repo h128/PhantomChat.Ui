@@ -69,6 +69,7 @@ export function useWebRTC() {
   );
 
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
 
   // Track multiple remote streams for group call grid!
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(
@@ -418,6 +419,10 @@ export function useWebRTC() {
     });
     peersRef.current.forEach((_, peerId) => removePeer(peerId));
     dispatch(clearCall(undefined));
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach((t) => t.stop());
+      screenStreamRef.current = null;
+    }
     setLocalStream((prev) => {
       if (prev) prev.getTracks().forEach((t) => t.stop());
       return null;
@@ -489,6 +494,101 @@ export function useWebRTC() {
     [localStream, dispatch],
   );
 
+  const stopScreenShare = useCallback(async () => {
+    if (!localStream || !screenStreamRef.current) return;
+
+    // Restore camera track to all peers
+    const cameraConstraints: MediaStreamConstraints = {
+      video: callState.selectedCameraId
+        ? { deviceId: { exact: callState.selectedCameraId } }
+        : true,
+    };
+
+    try {
+      const camMedia =
+        await navigator.mediaDevices.getUserMedia(cameraConstraints);
+      const camTrack = camMedia.getVideoTracks()[0];
+
+      if (camTrack) {
+        const replacePromises: Promise<void>[] = [];
+        peersRef.current.forEach((pc) => {
+          replacePromises.push(pc.replaceTrack("video", camTrack));
+        });
+        await Promise.all(replacePromises);
+
+        const oldTrack = localStream.getVideoTracks()[0];
+        if (oldTrack) {
+          oldTrack.stop();
+          localStream.removeTrack(oldTrack);
+        }
+        localStream.addTrack(camTrack);
+      }
+    } catch (err) {
+      // Camera may have been unplugged — just remove the screen track
+      const oldTrack = localStream.getVideoTracks()[0];
+      if (oldTrack) {
+        oldTrack.stop();
+        localStream.removeTrack(oldTrack);
+      }
+      console.log(
+        "Failed to restore camera after screen share. It may have been unplugged.",
+        { err },
+      );
+    }
+
+    screenStreamRef.current.getTracks().forEach((t) => t.stop());
+    screenStreamRef.current = null;
+    dispatch(setCallStatus({ screenShareEnabled: false }));
+  }, [localStream, callState.selectedCameraId, dispatch]);
+
+  const startScreenShare = useCallback(async () => {
+    if (!localStream) return;
+
+    try {
+      const displayStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: false,
+      });
+      screenStreamRef.current = displayStream;
+      const screenTrack = displayStream.getVideoTracks()[0];
+
+      // Handle browser "Stop sharing" button
+      screenTrack.onended = () => {
+        void stopScreenShare();
+      };
+
+      // Replace video track in all peer connections
+      const replacePromises: Promise<void>[] = [];
+      peersRef.current.forEach((pc) => {
+        replacePromises.push(pc.replaceTrack("video", screenTrack));
+      });
+      await Promise.all(replacePromises);
+
+      // Swap in local stream so local preview shows screen
+      const oldTrack = localStream.getVideoTracks()[0];
+      if (oldTrack) {
+        oldTrack.stop();
+        localStream.removeTrack(oldTrack);
+      }
+      localStream.addTrack(screenTrack);
+
+      dispatch(setCallStatus({ screenShareEnabled: true }));
+    } catch (err) {
+      // User cancelled the picker — not an error
+      if (err instanceof DOMException && err.name === "NotAllowedError") return;
+      toast.error("Failed to start screen sharing.");
+      console.error(err);
+    }
+  }, [localStream, dispatch, stopScreenShare]);
+
+  const toggleScreenShare = useCallback(async () => {
+    if (callState.screenShareEnabled) {
+      await stopScreenShare();
+    } else {
+      await startScreenShare();
+    }
+  }, [callState.screenShareEnabled, startScreenShare, stopScreenShare]);
+
   const getDevices = useCallback(async () => {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
@@ -520,6 +620,7 @@ export function useWebRTC() {
     hangUp,
     toggleMicrophone,
     toggleCamera,
+    toggleScreenShare,
     switchDevice,
     getDevices,
     localStream,
