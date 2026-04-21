@@ -1,4 +1,4 @@
-export const PROFILE_STORAGE_KEY = "phantomchat_profile";
+export const PROFILE_STORAGE_KEY = "fantomchat_profile";
 
 export type StoredProfile = {
   displayName: string;

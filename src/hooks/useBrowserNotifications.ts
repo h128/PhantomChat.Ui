@@ -128,8 +128,7 @@ export function useCallNotifications() {
       const roomMember = resolvedRoomId
         ? membersByRoom[resolvedRoomId]?.[callerUserId]
         : undefined;
-      const callerLabel =
-        roomMember?.displayName?.trim() || callerUserId;
+      const callerLabel = roomMember?.displayName?.trim() || callerUserId;
       const avatarUrl = getAvatarById(roomMember?.avatarId)?.src ?? null;
 
       const shown = await showIncomingCallNotification({

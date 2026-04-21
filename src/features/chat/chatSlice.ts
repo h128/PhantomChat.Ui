@@ -4,22 +4,22 @@ import type { RootState } from "../../app/store";
 
 export type PresenceMode = "focused" | "available" | "quiet";
 
-export interface Room {
+export type Room = {
   id: string;
   name: string;
   topic: string;
   members: number;
   unread: number;
-}
+};
 
-export interface FileAttachment {
+export type FileAttachment = {
   fileName: string;
   originalName: string;
   type: "image" | "file" | "audio";
   thumbnailFile?: string;
-}
+};
 
-export interface ChatMessage {
+export type ChatMessage = {
   id: string;
   senderId: string;
   senderName: string;
@@ -27,21 +27,22 @@ export interface ChatMessage {
   timestamp: string;
   attachment?: FileAttachment;
   origin?: ChatMessageOrigin;
-}
+};
 
 export type ChatMessageOrigin = "history" | "optimistic" | "realtime";
 
-export interface CallState {
+export type CallState = {
   status: "idle" | "calling" | "incoming" | "connected";
   peerId: string | null;
   isIncoming: boolean;
   callType: "video" | "voice";
   microphoneEnabled: boolean;
   cameraEnabled: boolean;
+  screenShareEnabled: boolean;
   selectedMicrophoneId: string | null;
   selectedCameraId: string | null;
   offer?: RTCSessionDescriptionInit;
-}
+};
 
 export type RoomMember = {
   userId: string;
@@ -245,6 +246,7 @@ const initialState: ChatState = {
     callType: "video",
     microphoneEnabled: true,
     cameraEnabled: true,
+    screenShareEnabled: false,
     selectedMicrophoneId: null,
     selectedCameraId: null,
   },
