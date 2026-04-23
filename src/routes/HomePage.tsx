@@ -104,7 +104,7 @@ export function HomePage() {
           >
             <img
               src="/comment.png"
-              alt="PhantomChat logo"
+              alt="Fantomchat logo"
               className="h-10 w-10 rounded-2xl object-cover"
             />
 
@@ -115,7 +115,7 @@ export function HomePage() {
                   isDark ? "text-slate-50" : "text-slate-900",
                 )}
               >
-                PhantomChat
+                Fantomchat
               </p>
               <p
                 className={clsx(
@@ -143,7 +143,7 @@ export function HomePage() {
             >
               <img
                 src="/comment.png"
-                alt="PhantomChat logo"
+                alt="Fantomchat logo"
                 className="mx-auto h-24 w-24 rounded-4xl object-cover shadow-[0_18px_40px_rgba(51,144,236,0.24)] sm:h-28 sm:w-28"
               />
 
@@ -230,7 +230,7 @@ export function HomePage() {
                   >
                     Room name
                   </label>
- 
+
                   <div className="flex items-center gap-3 sm:gap-4">
                     <MeetingNameInput
                       id="room-name"

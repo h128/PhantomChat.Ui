@@ -31,7 +31,7 @@ describe("user utilities", () => {
   });
 
   it("reuses an existing persistent user id", () => {
-    localStorage.setItem("phantomchat_user_uuid", "user_existing_123");
+    localStorage.setItem("fantomchat_user_uuid", "user_existing_123");
 
     expect(getPersistentUserId()).toBe("user_existing_123");
     expect(getPersistentUserName()).toBe("User existing");
@@ -44,6 +44,6 @@ describe("user utilities", () => {
     const userId = getPersistentUserId();
 
     expect(userId).toBe("user_4fzzzxj_loyw3v28");
-    expect(localStorage.getItem("phantomchat_user_uuid")).toBe(userId);
+    expect(localStorage.getItem("fantomchat_user_uuid")).toBe(userId);
   });
 });

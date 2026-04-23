@@ -105,13 +105,9 @@ describe("browserNotifications", () => {
   });
 
   it("creates readable notification titles and bodies", () => {
-    expect(createNotificationTitle("Alpha")).toBe(
-      "Alpha",
-    );
+    expect(createNotificationTitle("Alpha")).toBe("Alpha");
     expect(createIncomingCallTitle("Alpha")).toBe("Alpha is calling");
-    expect(createIncomingCallBody("video")).toBe(
-      "Incoming video call",
-    );
+    expect(createIncomingCallBody("video")).toBe("Incoming video call");
 
     expect(
       createNotificationBody({
