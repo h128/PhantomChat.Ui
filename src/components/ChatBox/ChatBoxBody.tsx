@@ -48,7 +48,7 @@ function ImageAttachment({
     const thumbName = attachment.thumbnailFile
       ? attachment.thumbnailFile
       : attachment.fileName;
-    downloadFile(roomName, thumbName)
+    downloadFile(roomName, thumbName, getPersistentUserId())
       .then((data) =>
         isEncryptionEnabled() ? decryptFile(data, roomKey) : data,
       )
@@ -81,7 +81,11 @@ function ImageAttachment({
     if (fullUrl) return;
 
     setLoadingFull(true);
-    const result = await downloadFile(roomName, attachment.fileName)
+    const result = await downloadFile(
+      roomName,
+      attachment.fileName,
+      getPersistentUserId(),
+    )
       .then((data) =>
         isEncryptionEnabled() ? decryptFile(data, roomKey) : data,
       )
@@ -155,7 +159,7 @@ async function downloadVoiceMessage(
   const { decryptFile, isEncryptionEnabled } =
     await import("../../services/crypto");
   const { downloadFile } = await import("../../services/fileUpload");
-  const data = await downloadFile(roomName, fileName);
+  const data = await downloadFile(roomName, fileName, getPersistentUserId());
   const decrypted = isEncryptionEnabled()
     ? await decryptFile(data, roomKey)
     : data;
@@ -348,7 +352,7 @@ function FileAttachmentCard({
 
   const handleDownload = async () => {
     setDownloading(true);
-    await downloadFile(roomName, attachment.fileName)
+    await downloadFile(roomName, attachment.fileName, getPersistentUserId())
       .then((data) =>
         isEncryptionEnabled() ? decryptFile(data, roomKey) : data,
       )

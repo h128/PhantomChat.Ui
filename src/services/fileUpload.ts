@@ -35,9 +35,15 @@ export async function uploadFile(
 export async function downloadFile(
   roomName: string,
   filename: string,
+  userUuid: string,
 ): Promise<Uint8Array> {
   const res = await fetch(
     `${BASE_URL}/download-document/${encodeURIComponent(roomName)}/${encodeURIComponent(filename)}`,
+    {
+      headers: {
+        "x-user-uuid": userUuid,
+      },
+    },
   );
   if (!res.ok) {
     throw new Error(`Download failed (${res.status})`);
