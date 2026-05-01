@@ -43,6 +43,10 @@ import { useNotificationPermission } from "../hooks/useBrowserNotifications";
 import { useWebRTC } from "../hooks/useWebRTC";
 import { decryptRoomKey, getPublicKeyHex } from "../services/crypto";
 import { fetchRoomHistory } from "../services/chatHistory";
+import {
+  getCachedFcmToken,
+  requestFcmToken,
+} from "../services/firebaseMessaging";
 import { SocketCommands } from "../services/socket/SocketCommands";
 import type { RoomResponse } from "../services/socket/types";
 import { getPersistentUserId } from "../utils/user";
@@ -77,6 +81,8 @@ async function joinRoom(
 ): Promise<{ roomCreated: boolean } | null> {
   try {
     const publicKey = await getPublicKeyHex();
+    const fcmToken =
+      (await requestFcmToken().catch(() => null)) ?? getCachedFcmToken() ?? "";
 
     const response = (await sendCommand(SocketCommands.JOIN_OR_CREATE_ROOM, {
       user_uuid: getPersistentUserId(),
@@ -84,6 +90,7 @@ async function joinRoom(
       public_key: publicKey,
       avatar_id: profile.avatarId,
       display_name: profile.displayName,
+      fcm_token: fcmToken,
     })) as RoomResponse;
 
     const status = response.status;
@@ -282,6 +289,7 @@ export function MeetingRoomPage() {
 
     if (permission === "granted") {
       toast.success("System notifications enabled.");
+      void requestFcmToken().catch(() => null);
       return;
     }
 
