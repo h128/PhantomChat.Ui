@@ -15,15 +15,21 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(
     self.clients
       .matchAll({ type: "window", includeUncontrolled: true })
-      .then((clients) => {
-        for (const client of clients) {
-          if ("focus" in client) {
-            if (client.url !== targetUrl && "navigate" in client) {
-              return client.navigate(targetUrl).then(() => client.focus());
-            }
+      .then(async (clients) => {
+        const exact = clients.find((c) => c.url === targetUrl);
+        if (exact) return exact.focus();
 
-            return client.focus();
+        const sameOrigin = clients.find(
+          (c) => new URL(c.url).origin === self.location.origin,
+        );
+        if (sameOrigin && "navigate" in sameOrigin) {
+          try {
+            const navigated = await sameOrigin.navigate(targetUrl);
+            if (navigated) return navigated.focus();
+          } catch {
+            /* fall through to openWindow */
           }
+          return sameOrigin.focus();
         }
 
         if (self.clients.openWindow) {
