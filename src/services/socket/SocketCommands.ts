@@ -18,7 +18,17 @@ export const SocketCommands = {
 
   /** WebRTC Signaling (Offer, Answer, Candidate, Reject, Hangup) */
   SIGNAL_CALL: 4,
+
+  /** Update user presence status (Active / Idle) */
+  SET_USER_STATUS: 5,
 } as const;
+
+export const UserStatus = {
+  ACTIVE: 0,
+  IDLE: 1,
+} as const;
+
+export type UserStatusValue = (typeof UserStatus)[keyof typeof UserStatus];
 
 export const SignalCallAction = {
   OFFER: 1,

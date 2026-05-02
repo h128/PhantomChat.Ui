@@ -40,6 +40,7 @@ import {
 import { selectResolvedTheme } from "../features/theme/themeSlice";
 import { useSocketCommand, useSocketState } from "../hooks/useSocket";
 import { useNotificationPermission } from "../hooks/useBrowserNotifications";
+import { useIdlePresence } from "../hooks/useIdlePresence";
 import { useWebRTC } from "../hooks/useWebRTC";
 import { decryptRoomKey, getPublicKeyHex } from "../services/crypto";
 import { fetchRoomHistory } from "../services/chatHistory";
@@ -260,6 +261,10 @@ export function MeetingRoomPage() {
       getDevices().then(setAvailableDevices);
     }
   }, [isSettingsOpen, getDevices]);
+
+  useIdlePresence({
+    enabled: socketState === "connected" && chatState.roomStatus === "joined",
+  });
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
 
