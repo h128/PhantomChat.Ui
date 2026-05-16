@@ -36,6 +36,7 @@ export const SignalCallAction = {
   REJECT: 3,
   CANDIDATE: 4,
   HANGUP: 5,
+  SCREEN_SHARE_STATE: 6,
 } as const;
 
 export type SocketCommand =

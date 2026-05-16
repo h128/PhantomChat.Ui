@@ -73,6 +73,7 @@ export type SignalingData = {
   sdpMid?: string;
   sdpMLineIndex?: number;
   usernameFragment?: string;
+  enabled?: boolean;
 };
 
 export type SignalCallRelayPayload = {
