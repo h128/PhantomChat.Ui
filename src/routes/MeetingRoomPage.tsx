@@ -155,12 +155,76 @@ async function joinRoom(
   return null;
 }
 
+const LocalVideo = ({
+  stream,
+  callType,
+  isSharing,
+  thumbnail,
+}: {
+  stream: MediaStream | null;
+  callType: "video" | "voice";
+  isSharing: boolean;
+  thumbnail?: boolean;
+}) => {
+  const ref = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (ref.current && stream) {
+      ref.current.srcObject = stream;
+    }
+  }, [stream]);
+
+  return (
+    <div
+      className={clsx(
+        "relative overflow-hidden rounded-xl bg-slate-800 shadow-inner",
+        thumbnail ? "h-full w-full" : "h-full w-full",
+      )}
+    >
+      {callType === "video" ? (
+        <video
+          ref={ref}
+          autoPlay
+          playsInline
+          muted
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center bg-slate-900">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-sky-500/10 text-sky-400">
+            <User size={thumbnail ? 20 : 32} />
+          </div>
+        </div>
+      )}
+      <div
+        className={clsx(
+          "absolute bottom-2 left-2 flex items-center gap-2 rounded bg-black/50 px-2 py-0.5 text-white",
+          thumbnail ? "text-[9px]" : "text-[10px]",
+        )}
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+        Local (You)
+        {isSharing && (
+          <span className="flex items-center gap-1 text-sky-400">
+            <MonitorUp size={thumbnail ? 8 : 10} />
+            Sharing
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const RemoteVideo = ({
   stream,
   label,
+  isSharing,
+  thumbnail,
 }: {
   stream: MediaStream;
   label?: string;
+  isSharing?: boolean;
+  thumbnail?: boolean;
 }) => {
   const ref = useRef<HTMLVideoElement>(null);
   const audioTracks = stream.getAudioTracks();
@@ -188,7 +252,12 @@ const RemoteVideo = ({
   }, [stream, videoTracks, audioTracks]);
 
   return (
-    <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-xl bg-slate-800 shadow-inner">
+    <div
+      className={clsx(
+        "relative flex items-center justify-center overflow-hidden rounded-xl bg-slate-800 shadow-inner",
+        thumbnail ? "h-full w-full" : "aspect-video",
+      )}
+    >
       <video
         ref={ref}
         autoPlay
@@ -201,21 +270,41 @@ const RemoteVideo = ({
 
       {!hasVideo && (
         <div className="relative z-10 flex flex-col items-center gap-2">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-sky-500/10 text-sky-400">
+          <div
+            className={clsx(
+              "flex items-center justify-center rounded-full bg-sky-500/10 text-sky-400",
+              thumbnail ? "h-10 w-10" : "h-16 w-16",
+            )}
+          >
             {hasAudio ? (
-              <Mic size={32} />
+              <Mic size={thumbnail ? 20 : 32} />
             ) : (
-              <MicOff size={32} className="text-rose-500" />
+              <MicOff size={thumbnail ? 20 : 32} className="text-rose-500" />
             )}
           </div>
-          <span className="text-[10px] font-medium text-slate-400">
-            {hasAudio ? "Audio Only" : "Muted / No Media"}
-          </span>
+          {!thumbnail && (
+            <span className="text-[10px] font-medium text-slate-400">
+              {hasAudio ? "Audio Only" : "Muted / No Media"}
+            </span>
+          )}
         </div>
       )}
-      <div className="absolute bottom-2 left-2 flex items-center gap-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">
-        {!hasAudio && <MicOff size={10} className="text-rose-500" />}
+      <div
+        className={clsx(
+          "absolute bottom-2 left-2 flex items-center gap-2 rounded bg-black/50 px-2 py-0.5 text-white",
+          thumbnail ? "text-[9px]" : "text-[10px]",
+        )}
+      >
+        {!hasAudio && (
+          <MicOff size={thumbnail ? 8 : 10} className="text-rose-500" />
+        )}
         {label}
+        {isSharing && (
+          <span className="flex items-center gap-1 text-sky-400">
+            <MonitorUp size={thumbnail ? 8 : 10} />
+            Sharing
+          </span>
+        )}
       </div>
     </div>
   );
@@ -265,8 +354,6 @@ export function MeetingRoomPage() {
   useIdlePresence({
     enabled: socketState === "connected" && chatState.roomStatus === "joined",
   });
-
-  const localVideoRef = useRef<HTMLVideoElement>(null);
 
   const isDark = resolvedTheme === "dark";
   const normalizedRoomName = normalizeMeetingName(roomName);
@@ -407,13 +494,6 @@ export function MeetingRoomPage() {
       abortController.abort();
     };
   }, [normalizedRoomName, chatState.roomStatus, chatState.roomKey, dispatch]);
-
-  // Handle Video Streams
-  useEffect(() => {
-    if (localVideoRef.current && localStream) {
-      localVideoRef.current.srcObject = localStream;
-    }
-  }, [localStream, callState.status]);
 
   // 2. Lifecycle adapter: Leave ONLY on actual unmount
   const leaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -626,69 +706,114 @@ export function MeetingRoomPage() {
                 </p>
               </div>
             </div>
-            {callState.status === "connected" && (
-              <div
-                className={clsx(
-                  "mb-8 grid w-full gap-4",
-                  isCallExpanded && "min-h-0 flex-1",
-                  remoteStreams.size === 0
-                    ? "grid-cols-1"
-                    : remoteStreams.size === 1
-                      ? "grid-cols-2"
-                      : "grid-cols-2 sm:grid-cols-3",
-                )}
-              >
-                {Array.from(remoteStreams.entries()).map(([peerId, stream]) => (
-                  <RemoteVideo
-                    key={peerId}
-                    stream={stream}
-                    label={`Remote (${peerId.slice(0, 4)})`}
-                  />
-                ))}
-
-                <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-800 shadow-inner">
-                  {callState.callType === "video" ? (
-                    <video
-                      ref={localVideoRef}
-                      autoPlay
-                      playsInline
-                      muted
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-slate-900">
-                      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-sky-500/10 text-sky-400">
-                        <User size={32} />
-                      </div>
-                    </div>
+            {callState.status === "connected" &&
+              (callState.sharingPeerId ? (
+                <div
+                  className={clsx(
+                    "mb-8 flex w-full flex-col gap-3",
+                    isCallExpanded && "min-h-0 flex-1",
                   )}
-                  <div className="absolute bottom-2 left-2 flex items-center gap-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    Local (You)
-                    {callState.screenShareEnabled && (
-                      <span className="flex items-center gap-1 text-sky-400">
-                        <MonitorUp size={10} />
-                        Sharing
-                      </span>
+                >
+                  <div
+                    className={clsx(
+                      "relative w-full overflow-hidden rounded-xl bg-slate-800 shadow-inner",
+                      isCallExpanded ? "min-h-0 flex-1" : "aspect-video",
+                    )}
+                  >
+                    {callState.sharingPeerId === "local" ? (
+                      <LocalVideo
+                        stream={localStream}
+                        callType={callState.callType}
+                        isSharing
+                      />
+                    ) : (
+                      (() => {
+                        const sharerStream = remoteStreams.get(
+                          callState.sharingPeerId,
+                        );
+                        return sharerStream ? (
+                          <RemoteVideo
+                            stream={sharerStream}
+                            label={`Remote (${callState.sharingPeerId.slice(0, 4)})`}
+                            isSharing
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-slate-400">
+                            Waiting for shared screen…
+                          </div>
+                        );
+                      })()
+                    )}
+                  </div>
+
+                  <div className="flex w-full gap-2 overflow-x-auto">
+                    {Array.from(remoteStreams.entries())
+                      .filter(([peerId]) => peerId !== callState.sharingPeerId)
+                      .map(([peerId, stream]) => (
+                        <div
+                          key={peerId}
+                          className="aspect-video w-32 shrink-0 sm:w-40"
+                        >
+                          <RemoteVideo
+                            stream={stream}
+                            label={`Remote (${peerId.slice(0, 4)})`}
+                            thumbnail
+                          />
+                        </div>
+                      ))}
+
+                    {callState.sharingPeerId !== "local" && (
+                      <div className="aspect-video w-32 shrink-0 sm:w-40">
+                        <LocalVideo
+                          stream={localStream}
+                          callType={callState.callType}
+                          isSharing={false}
+                          thumbnail
+                        />
+                      </div>
                     )}
                   </div>
                 </div>
-              </div>
-            )}
+              ) : (
+                <div
+                  className={clsx(
+                    "mb-8 grid w-full gap-4",
+                    isCallExpanded && "min-h-0 flex-1",
+                    remoteStreams.size === 0
+                      ? "grid-cols-1"
+                      : remoteStreams.size === 1
+                        ? "grid-cols-2"
+                        : "grid-cols-2 sm:grid-cols-3",
+                  )}
+                >
+                  {Array.from(remoteStreams.entries()).map(
+                    ([peerId, stream]) => (
+                      <RemoteVideo
+                        key={peerId}
+                        stream={stream}
+                        label={`Remote (${peerId.slice(0, 4)})`}
+                      />
+                    ),
+                  )}
+
+                  <div className="relative aspect-video">
+                    <LocalVideo
+                      stream={localStream}
+                      callType={callState.callType}
+                      isSharing={callState.screenShareEnabled}
+                    />
+                  </div>
+                </div>
+              ))}
             {callState.status === "calling" &&
               callState.callType === "video" && (
                 <div className="mb-8 flex w-full justify-center">
-                  <div className="relative aspect-video w-64 overflow-hidden rounded-xl bg-slate-800 shadow-inner">
-                    <video
-                      ref={localVideoRef}
-                      autoPlay
-                      playsInline
-                      muted
-                      className="h-full w-full object-cover"
+                  <div className="relative aspect-video w-64">
+                    <LocalVideo
+                      stream={localStream}
+                      callType="video"
+                      isSharing={false}
                     />
-                    <div className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white">
-                      Preview
-                    </div>
                   </div>
                 </div>
               )}

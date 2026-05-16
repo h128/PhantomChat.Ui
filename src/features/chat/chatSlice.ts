@@ -39,6 +39,9 @@ export type CallState = {
   microphoneEnabled: boolean;
   cameraEnabled: boolean;
   screenShareEnabled: boolean;
+  // UUID of the participant currently sharing their screen ("local" sentinel
+  // for the local user). null when no one is sharing.
+  sharingPeerId: string | null;
   selectedMicrophoneId: string | null;
   selectedCameraId: string | null;
   offer?: RTCSessionDescriptionInit;
@@ -247,6 +250,7 @@ const initialState: ChatState = {
     microphoneEnabled: true,
     cameraEnabled: true,
     screenShareEnabled: false,
+    sharingPeerId: null,
     selectedMicrophoneId: null,
     selectedCameraId: null,
   },

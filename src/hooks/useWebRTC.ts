@@ -86,19 +86,31 @@ export function useWebRTC() {
     return () => stopRinging();
   }, [callState.status]);
 
-  const removePeer = useCallback((peerId: string) => {
-    const pc = peersRef.current.get(peerId);
-    if (pc) {
-      pc.close();
-      peersRef.current.delete(peerId);
-    }
-    pendingCandidatesRef.current.delete(peerId);
-    setRemoteStreams((prev) => {
-      const next = new Map(prev);
-      next.delete(peerId);
-      return next;
-    });
-  }, []);
+  const sharingPeerIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    sharingPeerIdRef.current = callState.sharingPeerId;
+  }, [callState.sharingPeerId]);
+
+  const removePeer = useCallback(
+    (peerId: string) => {
+      const pc = peersRef.current.get(peerId);
+      if (pc) {
+        pc.close();
+        peersRef.current.delete(peerId);
+      }
+      pendingCandidatesRef.current.delete(peerId);
+      setRemoteStreams((prev) => {
+        const next = new Map(prev);
+        next.delete(peerId);
+        return next;
+      });
+      // If the removed peer was the active screen-sharer, drop focus
+      if (sharingPeerIdRef.current === peerId) {
+        dispatch(setCallStatus({ sharingPeerId: null }));
+      }
+    },
+    [dispatch],
+  );
 
   const createPeer = useCallback(
     (peerId: string, currentLocalStream: MediaStream | null) => {
@@ -283,6 +295,11 @@ export function useWebRTC() {
           // The backend strips data for REJECT and HANGUP, but sender_uuid tells us who left.
           removePeer(sender_uuid);
 
+          // If the peer who left was the one sharing, drop focused layout
+          if (callState.sharingPeerId === sender_uuid) {
+            dispatch(setCallStatus({ sharingPeerId: null }));
+          }
+
           // If nobody else is left, clear the call locally
           if (peersRef.current.size === 0) {
             dispatch(clearCall(undefined));
@@ -293,10 +310,22 @@ export function useWebRTC() {
           }
           break;
         }
+
+        case SignalCallAction.SCREEN_SHARE_STATE: {
+          // Untargeted notification — backend relays to the whole room
+          const enabled = data?.enabled === true;
+          if (enabled) {
+            dispatch(setCallStatus({ sharingPeerId: sender_uuid }));
+          } else if (callState.sharingPeerId === sender_uuid) {
+            dispatch(setCallStatus({ sharingPeerId: null }));
+          }
+          break;
+        }
       }
     },
     [
       callState.status,
+      callState.sharingPeerId,
       activeRoomId,
       localStream,
       dispatch,
@@ -494,6 +523,15 @@ export function useWebRTC() {
     [localStream, dispatch],
   );
 
+  const sendScreenShareState = useCallback((enabled: boolean) => {
+    sendCommandRef
+      .current(SocketCommands.SIGNAL_CALL, {
+        action: SignalCallAction.SCREEN_SHARE_STATE,
+        data: { enabled },
+      })
+      .catch(console.error);
+  }, []);
+
   const stopScreenShare = useCallback(async () => {
     if (!localStream || !screenStreamRef.current) return;
 
@@ -538,8 +576,22 @@ export function useWebRTC() {
 
     screenStreamRef.current.getTracks().forEach((t) => t.stop());
     screenStreamRef.current = null;
-    dispatch(setCallStatus({ screenShareEnabled: false }));
-  }, [localStream, callState.selectedCameraId, dispatch]);
+    dispatch(
+      setCallStatus({
+        screenShareEnabled: false,
+        // Only clear focus if WE were the one focused — a remote may have
+        // started sharing in the meantime.
+        ...(callState.sharingPeerId === "local" ? { sharingPeerId: null } : {}),
+      }),
+    );
+    sendScreenShareState(false);
+  }, [
+    localStream,
+    callState.selectedCameraId,
+    callState.sharingPeerId,
+    dispatch,
+    sendScreenShareState,
+  ]);
 
   const startScreenShare = useCallback(async () => {
     if (!localStream) return;
@@ -572,14 +624,17 @@ export function useWebRTC() {
       }
       localStream.addTrack(screenTrack);
 
-      dispatch(setCallStatus({ screenShareEnabled: true }));
+      dispatch(
+        setCallStatus({ screenShareEnabled: true, sharingPeerId: "local" }),
+      );
+      sendScreenShareState(true);
     } catch (err) {
       // User cancelled the picker — not an error
       if (err instanceof DOMException && err.name === "NotAllowedError") return;
       toast.error("Failed to start screen sharing.");
       console.error(err);
     }
-  }, [localStream, dispatch, stopScreenShare]);
+  }, [localStream, dispatch, stopScreenShare, sendScreenShareState]);
 
   const toggleScreenShare = useCallback(async () => {
     if (callState.screenShareEnabled) {
